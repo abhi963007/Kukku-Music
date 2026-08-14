@@ -222,6 +222,68 @@ class MusicServices extends getx.GetxService {
     return songs;
   }
 
+  /// Fetch infinite radio recommendations for a specific track
+  Future<List<SongModel>> getRadioTracks(String videoId) async {
+    if (videoId.isEmpty) return [];
+
+    try {
+      final body = Map.of(_context);
+      body['videoId'] = videoId;
+      body['playlistId'] = 'RDAMVM$videoId';
+      body['isAudioOnly'] = true;
+
+      final response = await dio.post(
+        '$domain/youtubei/v1/next',
+        data: jsonEncode(body),
+        options: Options(headers: _headers),
+      );
+
+      final data = response.data;
+      final List<SongModel> songs = [];
+
+      final contents = data['contents']?['singleColumnMusicWatchNextResultsRenderer']?['tabbedRenderer']?['watchNextTabbedResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['musicQueueRenderer']?['content']?['playlistPanelRenderer']?['contents'];
+
+      if (contents != null && contents is List) {
+        for (final item in contents) {
+          final renderer = item['playlistPanelVideoRenderer'];
+          if (renderer == null) continue;
+
+          final id = renderer['videoId']?.toString() ?? '';
+          final titleRuns = renderer['title']?['runs'] as List?;
+          final title = (titleRuns != null && titleRuns.isNotEmpty) ? titleRuns[0]['text']?.toString() ?? '' : '';
+          final artistRuns = renderer['shortBylineText']?['runs'] as List?;
+          final artist = artistRuns?.map((r) => r['text'] ?? '').join('') ?? 'Unknown';
+
+          final thumbs = renderer['thumbnail']?['thumbnails'] as List?;
+          String thumbnail = '';
+          if (thumbs != null && thumbs.isNotEmpty) {
+            thumbnail = thumbs.last['url'] ?? '';
+            if (thumbnail.contains('=w') || thumbnail.contains('=s')) {
+              thumbnail = thumbnail.replaceAll(RegExp(r'=w\d+-h\d+.*'), '=w500-h500-l90-rj');
+            }
+          }
+
+          if (id.isNotEmpty && title.isNotEmpty) {
+            songs.add(
+              SongModel(
+                id: id,
+                title: title,
+                artist: artist,
+                album: "Radio Recommendation",
+                artUri: thumbnail,
+                duration: const Duration(minutes: 3, seconds: 30),
+              ),
+            );
+          }
+        }
+      }
+      return songs;
+    } catch (e) {
+      printERROR("getRadioTracks failed for $videoId", e);
+      return [];
+    }
+  }
+
   /// Piped fallback search
   Future<List<SongModel>> _searchPiped(String query) async {
     for (final instance in PipedStreamService.pipedInstances) {

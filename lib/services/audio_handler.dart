@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,6 +15,7 @@ import '../models/song_model.dart';
 import '../models/streaming_data.dart';
 import '../utils/helper.dart';
 import 'background_task.dart';
+import 'music_service.dart';
 import 'piped_stream_service.dart';
 
 Future<AudioHandler> initAudioService() async {
@@ -366,6 +368,51 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     await _player.play();
 
     _addToRecentHistory(currentSong);
+
+    // If remaining queue is small (<= 3 songs), auto-replenish with continuous radio recommendations
+    if (_currentIndex >= queue.value.length - 3 || queue.value.length <= 4) {
+      _autoReplenishRadioQueue(currentSong.id);
+    }
+  }
+
+  bool _isReplenishingQueue = false;
+
+  /// Fetch and append similar radio tracks in the background for endless playback
+  Future<void> _autoReplenishRadioQueue(String seedSongId) async {
+    if (_isReplenishingQueue || seedSongId.isEmpty) return;
+    _isReplenishingQueue = true;
+
+    try {
+      printINFO('Auto-replenishing radio queue for seed: $seedSongId');
+      final MusicServices musicService = getx.Get.isRegistered<MusicServices>()
+          ? getx.Get.find<MusicServices>()
+          : MusicServices();
+
+      final recommendedSongs = await musicService.getRadioTracks(seedSongId);
+
+      if (recommendedSongs.isNotEmpty) {
+        final currentQueue = List<MediaItem>.from(queue.value);
+        final existingIds = currentQueue.map((e) => e.id).toSet();
+
+        final List<MediaItem> newItems = [];
+        for (final song in recommendedSongs) {
+          if (!existingIds.contains(song.id)) {
+            newItems.add(song.toMediaItem());
+            existingIds.add(song.id);
+          }
+        }
+
+        if (newItems.isNotEmpty) {
+          currentQueue.addAll(newItems);
+          queue.add(currentQueue);
+          printINFO('Appended ${newItems.length} continuous radio tracks to queue. New total: ${currentQueue.length}');
+        }
+      }
+    } catch (e) {
+      printERROR('Failed to replenish radio queue', e);
+    } finally {
+      _isReplenishingQueue = false;
+    }
   }
 
   void _addToRecentHistory(MediaItem item) {
@@ -406,13 +453,26 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> skipToNext() async {
     final q = queue.value;
     if (q.isEmpty) return;
+
     if (_currentIndex + 1 < q.length) {
       await _playSongAtIndex(_currentIndex + 1);
-    } else if (loopModeEnabled) {
-      await _playSongAtIndex(0);
     } else {
-      await _player.seek(Duration.zero);
-      await _player.pause();
+      // Reached the end of queue! Immediately replenish radio tracks and continue playing
+      final lastSongId = q.isNotEmpty ? q[_currentIndex].id : '';
+      if (lastSongId.isNotEmpty) {
+        await _autoReplenishRadioQueue(lastSongId);
+        if (_currentIndex + 1 < queue.value.length) {
+          await _playSongAtIndex(_currentIndex + 1);
+          return;
+        }
+      }
+
+      if (loopModeEnabled) {
+        await _playSongAtIndex(0);
+      } else {
+        await _player.seek(Duration.zero);
+        await _player.pause();
+      }
     }
   }
 
@@ -463,6 +523,8 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         }
         final idx = currentQueue.indexWhere((q) => q.id == item.id);
         await _playSongAtIndex(idx);
+        // Pre-fetch infinite radio recommendations in background
+        _autoReplenishRadioQueue(item.id);
         return true;
 
       case 'playQueue':
