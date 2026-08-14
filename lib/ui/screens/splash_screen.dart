@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, unnecessary_underscores
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -84,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 gradient: RadialGradient(
                   colors: [
                     AppTheme.primary.withOpacity(0.22),
-                    AppTheme.accent.withOpacity(0.12),
+                    AppTheme.primaryAccent.withOpacity(0.12),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.55, 1.0],
@@ -127,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         child: Image.asset(
                           'assets/images/app_icon.png',
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (context, error, stackTrace) => Container(
                             decoration: const BoxDecoration(
                               gradient: AppTheme.primaryGradient,
                             ),
