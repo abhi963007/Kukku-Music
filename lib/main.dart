@@ -10,7 +10,7 @@ import 'controllers/settings_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/downloader.dart';
 import 'services/music_service.dart';
-import 'ui/screens/main_navigation_screen.dart';
+import 'ui/screens/splash_screen.dart';
 import 'ui/theme/app_theme.dart';
 import 'utils/helper.dart';
 
@@ -66,7 +66,7 @@ class KukkuApp extends StatelessWidget {
       title: 'Kukku',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const MainNavigationScreen(),
+      home: const SplashScreen(),
     );
   }
 }
