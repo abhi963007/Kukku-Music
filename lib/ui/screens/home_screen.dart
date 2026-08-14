@@ -192,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ── SECTION 1: Trending & Top Hits (Horizontal Cards) ────────
                 if (_homeData != null && _homeData!.trending.isNotEmpty) ...[
                   _buildSectionHeader(
-                    title: "$_selectedLanguage Trending Hits",
+                    title: _selectedLanguage == "Trending" ? "Trending Hits" : "$_selectedLanguage Trending Hits",
                     subtitle: "Hottest tracks right now",
                     onPlayAll: () => _playerController.playQueue(_homeData!.trending, 0),
                   ),

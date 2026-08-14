@@ -49,6 +49,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   bool shuffleModeEnabled = false;
   String? currentSongUrl;
   int _currentIndex = 0;
+  bool _isTransitioning = false;
 
   AudioPlayer get player => _player;
   int get currentIndex => _currentIndex;
@@ -163,7 +164,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   void _listenForCompletion() {
     _player.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed) {
+      if (state == ProcessingState.completed && !_isTransitioning) {
         if (loopModeEnabled) {
           _player.seek(Duration.zero);
           _player.play();
@@ -320,12 +321,18 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (index < 0 || index >= queue.value.length) return;
 
     _currentIndex = index;
+    _isTransitioning = true;
     final currentSong = queue.value[index];
 
     isSongLoading = true;
     playbackState.add(
       playbackState.value.copyWith(processingState: AudioProcessingState.loading),
     );
+
+    // Stop the player first to prevent completion events during transition
+    try {
+      await _player.stop();
+    } catch (_) {}
 
     // Clear the playlist (Harmony pattern)
     if (_playList.children.isNotEmpty) {
@@ -338,11 +345,15 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     final streamInfo = await checkNGetUrl(currentSong.id, generateNewUrl: generateNewUrl);
 
     // Guard: if index changed while awaiting, abort
-    if (index != _currentIndex) return;
+    if (index != _currentIndex) {
+      _isTransitioning = false;
+      return;
+    }
 
     if (!streamInfo.playable || streamInfo.activeAudio == null) {
       currentSongUrl = null;
       isSongLoading = false;
+      _isTransitioning = false;
       playbackState.add(playbackState.value.copyWith(
         processingState: AudioProcessingState.error,
         errorMessage: streamInfo.statusMSG,
@@ -364,6 +375,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     // Add to playlist and play (Harmony pattern: _playList.add → _player.play)
     await _playList.add(_createAudioSource(currentSong));
     isSongLoading = false;
+    _isTransitioning = false;
 
     await _player.play();
 
