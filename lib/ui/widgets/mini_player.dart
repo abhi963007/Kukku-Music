@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unnecessary_underscores
+// ignore_for_file: deprecated_member_use
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -25,49 +25,43 @@ class MiniPlayer extends StatelessWidget {
       final total = playerController.totalDuration.value.inMilliseconds.toDouble();
       final progress = total > 0 ? (pos / total).clamp(0.0, 1.0) : 0.0;
 
-      return GestureDetector(
-        onTap: () {
-          Get.to(
-            () => const PlayerScreen(),
-            transition: Transition.downToUp,
-            duration: const Duration(milliseconds: 280),
-          );
-        },
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceLight.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+      return Material(
+        color: const Color(0xFF141720),
+        child: InkWell(
+          onTap: () {
+            Get.to(
+              () => const PlayerScreen(),
+              transition: Transition.downToUp,
+              duration: const Duration(milliseconds: 280),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF141720),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withOpacity(0.08),
+                  width: 0.8,
+                ),
               ),
-            ],
-            border: Border.all(
-              color: AppTheme.primary.withOpacity(0.3),
-              width: 1,
             ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Top micro progress bar
                 LinearProgressIndicator(
                   value: progress,
-                  minHeight: 2.5,
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  minHeight: 2.0,
+                  backgroundColor: Colors.white.withOpacity(0.06),
                   valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   child: Row(
                     children: [
+                      // Song Thumbnail
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         child: SizedBox(
                           width: 44,
                           height: 44,
@@ -75,18 +69,20 @@ class MiniPlayer extends StatelessWidget {
                               ? CachedNetworkImage(
                                   imageUrl: song.artUri,
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => Container(
-                                    color: AppTheme.surface,
-                                    child: const Icon(Icons.music_note, color: Colors.white),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: AppTheme.surfaceLight,
+                                    child: const Icon(Icons.music_note, color: Colors.white70, size: 22),
                                   ),
                                 )
                               : Container(
-                                  color: AppTheme.surface,
-                                  child: const Icon(Icons.music_note, color: Colors.white),
+                                  color: AppTheme.surfaceLight,
+                                  child: const Icon(Icons.music_note, color: Colors.white70, size: 22),
                                 ),
                         ),
                       ),
                       const SizedBox(width: 12),
+
+                      // Song Title & Artist
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,6 +96,7 @@ class MiniPlayer extends StatelessWidget {
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13.5,
+                                letterSpacing: 0.2,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -115,12 +112,14 @@ class MiniPlayer extends StatelessWidget {
                           ],
                         ),
                       ),
+
+                      // Controls
                       if (isBuffering)
                         const SizedBox(
-                          width: 32,
-                          height: 32,
+                          width: 38,
+                          height: 38,
                           child: Padding(
-                            padding: EdgeInsets.all(6),
+                            padding: EdgeInsets.all(8),
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               color: AppTheme.primary,
@@ -135,6 +134,7 @@ class MiniPlayer extends StatelessWidget {
                             size: 28,
                           ),
                           onPressed: playerController.togglePlayPause,
+                          splashRadius: 20,
                         ),
                       IconButton(
                         icon: const Icon(
@@ -143,6 +143,7 @@ class MiniPlayer extends StatelessWidget {
                           size: 26,
                         ),
                         onPressed: playerController.skipNext,
+                        splashRadius: 20,
                       ),
                     ],
                   ),
