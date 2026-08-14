@@ -24,14 +24,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final PlayerController _playerController = Get.find<PlayerController>();
 
   final List<Map<String, dynamic>> _languages = [
-    {"label": "Trending", "code": "trending", "icon": "🔥"},
-    {"label": "Malayalam", "code": "malayalam", "icon": "🌴"},
-    {"label": "Tamil", "code": "tamil", "icon": "⚡"},
-    {"label": "Hindi", "code": "hindi", "icon": "🎵"},
-    {"label": "Telugu", "code": "telugu", "icon": "⭐"},
-    {"label": "Kannada", "code": "kannada", "icon": "🎶"},
-    {"label": "Punjabi", "code": "punjabi", "icon": "💥"},
-    {"label": "English", "code": "english", "icon": "🌍"},
+    {"label": "Trending", "code": "trending"},
+    {"label": "Malayalam", "code": "malayalam"},
+    {"label": "Tamil", "code": "tamil"},
+    {"label": "Hindi", "code": "hindi"},
+    {"label": "Telugu", "code": "telugu"},
+    {"label": "Kannada", "code": "kannada"},
+    {"label": "Punjabi", "code": "punjabi"},
+    {"label": "English", "code": "english"},
   ];
 
   String _selectedLanguage = "Trending";
@@ -149,20 +149,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(lang["icon"] as String, style: const TextStyle(fontSize: 14)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  lang["label"] as String,
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : AppTheme.textSecondary,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
+                            child: Center(
+                              child: Text(
+                                lang["label"] as String,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                  fontSize: 13,
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
