@@ -377,6 +377,8 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     isSongLoading = false;
     _isTransitioning = false;
 
+    // Always start from the beginning — prevents resuming a previously-played song mid-way
+    await _player.seek(Duration.zero);
     await _player.play();
 
     _addToRecentHistory(currentSong);
