@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../models/song_model.dart';
 import '../utils/helper.dart';
+import 'piped_stream_service.dart';
 
 enum AudioQuality {
   Low,
@@ -24,9 +24,7 @@ class MusicServices extends getx.GetxService {
     'accept': '*/*',
     'accept-encoding': 'gzip, deflate',
     'content-type': 'application/json',
-    'content-encoding': 'gzip',
     'origin': domain,
-    'cookie': 'CONSENT=YES+1',
   };
 
   final Map<String, dynamic> _context = {
@@ -34,6 +32,7 @@ class MusicServices extends getx.GetxService {
       'client': {
         "clientName": "WEB_REMIX",
         "clientVersion": "1.20240101.01.00",
+        "hl": "en",
       },
       'user': {}
     }
@@ -104,39 +103,157 @@ class MusicServices extends getx.GetxService {
     return null;
   }
 
-  /// Search tracks using pure YoutubeExplode with metadata mapping
+  /// Search tracks using direct YouTube Music InnerTube endpoint with Piped fallback
   Future<List<SongModel>> searchTracks(String query) async {
-    final yt = YoutubeExplode();
+    if (query.trim().isEmpty) return [];
+
     try {
-      final searchResults = await yt.search.search(query);
-      final List<SongModel> songs = [];
+      final body = Map.of(_context);
+      body['query'] = query;
 
-      for (final video in searchResults) {
-        // Filter out live streams or unplayable entries
-        if (video.isLive) continue;
+      final response = await dio.post(
+        '$domain/youtubei/v1/search',
+        data: jsonEncode(body),
+        options: Options(headers: _headers),
+      );
 
-        songs.add(
-          SongModel(
-            id: video.id.value,
-            title: video.title,
-            artist: video.author,
-            album: video.channelId.value,
-            artUri: video.thumbnails.highResUrl,
-            duration: video.duration ?? const Duration(minutes: 3),
-            extras: {
-              'views': video.engagement.viewCount,
-              'uploadDate': video.uploadDate?.toIso8601String(),
-            },
-          ),
-        );
-      }
-      return songs;
+      final List<SongModel> songs = _parseInnertubeSearchResponse(response.data, "Search");
+      if (songs.isNotEmpty) return songs;
     } catch (e) {
-      printERROR("Search error for query: $query", e);
-      return [];
-    } finally {
-      yt.close();
+      printERROR("InnerTube search failed for query: $query, attempting Piped fallback", e);
     }
+
+    // Piped fallback search
+    try {
+      return await _searchPiped(query);
+    } catch (e) {
+      printERROR("Piped fallback search failed for: $query", e);
+      return [];
+    }
+  }
+
+  /// Parse structured InnerTube search response
+  List<SongModel> _parseInnertubeSearchResponse(dynamic data, String category) {
+    final List<SongModel> songs = [];
+    if (data == null || data is! Map) return songs;
+
+    final tab = data['contents']?['tabbedSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'];
+    if (tab != null && tab is List) {
+      for (final section in tab) {
+        final itemSection = section['itemSectionRenderer'];
+        final shelf = section['musicShelfRenderer'] ?? section['musicCardShelfRenderer'] ?? itemSection;
+
+        final contents = shelf?['contents'] ?? itemSection?['contents'];
+        if (contents != null && contents is List) {
+          for (final item in contents) {
+            String title = '';
+            String videoId = '';
+            String artist = 'Unknown';
+            String thumbnail = '';
+
+            if (item.containsKey('musicResponsiveListItemRenderer')) {
+              final renderer = item['musicResponsiveListItemRenderer'];
+              final flexCols = renderer['flexColumns'] as List?;
+              if (flexCols != null && flexCols.isNotEmpty) {
+                final titleRuns = flexCols[0]?['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+                if (titleRuns != null && titleRuns.isNotEmpty) {
+                  title = titleRuns[0]['text'] ?? '';
+                  videoId = titleRuns[0]['navigationEndpoint']?['watchEndpoint']?['videoId'] ?? '';
+                }
+
+                if (flexCols.length > 1) {
+                  final subRuns = flexCols[1]?['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+                  if (subRuns != null && subRuns.isNotEmpty) {
+                    artist = subRuns.map((r) => r['text'] ?? '').join('');
+                  }
+                }
+              }
+
+              if (videoId.isEmpty) {
+                videoId = renderer['playlistItemData']?['videoId'] ??
+                    renderer['navigationEndpoint']?['watchEndpoint']?['videoId'] ??
+                    renderer['overlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']?['watchEndpoint']?['videoId'] ??
+                    '';
+              }
+
+              final thumbs = renderer['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+              if (thumbs != null && thumbs.isNotEmpty) {
+                thumbnail = thumbs.last['url'] ?? '';
+              }
+            } else if (item.containsKey('musicTwoRowItemRenderer')) {
+              final renderer = item['musicTwoRowItemRenderer'];
+              final titleRuns = renderer['title']?['runs'] as List?;
+              if (titleRuns != null && titleRuns.isNotEmpty) {
+                title = titleRuns[0]['text'] ?? '';
+                videoId = renderer['navigationEndpoint']?['watchEndpoint']?['videoId'] ?? '';
+              }
+              final subRuns = renderer['subtitle']?['runs'] as List?;
+              if (subRuns != null && subRuns.isNotEmpty) {
+                artist = subRuns.map((r) => r['text'] ?? '').join('');
+              }
+              final thumbs = renderer['thumbnailRenderer']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+              if (thumbs != null && thumbs.isNotEmpty) {
+                thumbnail = thumbs.last['url'] ?? '';
+              }
+            }
+
+            if (videoId.isNotEmpty && title.isNotEmpty) {
+              if (thumbnail.contains('=w') || thumbnail.contains('=s')) {
+                thumbnail = thumbnail.replaceAll(RegExp(r'=w\d+-h\d+.*'), '=w500-h500-l90-rj');
+              }
+              songs.add(
+                SongModel(
+                  id: videoId,
+                  title: title,
+                  artist: artist,
+                  album: category,
+                  artUri: thumbnail,
+                  duration: const Duration(minutes: 3, seconds: 30),
+                  extras: {
+                    'uploadDate': DateTime.now().toIso8601String(),
+                  },
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+    return songs;
+  }
+
+  /// Piped fallback search
+  Future<List<SongModel>> _searchPiped(String query) async {
+    for (final instance in PipedStreamService.pipedInstances) {
+      try {
+        final uri = Uri.parse("$instance/search?q=${Uri.encodeComponent(query)}&filter=music_songs");
+        final response = await dio.getUri(uri).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200 && response.data != null) {
+          final items = response.data['items'] as List<dynamic>? ?? [];
+          final songs = <SongModel>[];
+          for (final item in items) {
+            final url = item['url']?.toString() ?? '';
+            final videoId = url.replaceFirst('/watch?v=', '');
+            if (videoId.isNotEmpty) {
+              songs.add(
+                SongModel(
+                  id: videoId,
+                  title: item['title'] ?? 'Unknown Track',
+                  artist: item['uploaderName'] ?? 'Unknown Artist',
+                  album: "Piped Search",
+                  artUri: item['thumbnail'] ?? '',
+                  duration: Duration(seconds: item['duration'] is int ? item['duration'] : 200),
+                ),
+              );
+            }
+          }
+          if (songs.isNotEmpty) return songs;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return [];
   }
 
   /// Cache for language sections to make tab switching instantaneous
@@ -144,34 +261,35 @@ class MusicServices extends getx.GetxService {
 
   /// Fetch categorized content for a specific language
   Future<LanguageHomeData> getLanguageHomeSections(String language) async {
-    if (_languageCache.containsKey(language)) {
+    if (_languageCache.containsKey(language) && _languageCache[language]!.trending.isNotEmpty) {
       return _languageCache[language]!;
     }
 
-    final yt = YoutubeExplode();
     try {
       final queries = _getQueriesForLanguage(language);
 
-      // Fetch trending and movie hits in parallel for maximum speed
+      // Fetch all three sections concurrently
       final results = await Future.wait([
-        yt.search.search(queries.trendingQuery),
-        yt.search.search(queries.movieHitsQuery),
-        yt.search.search(queries.melodiesQuery),
+        searchTracks(queries.trendingQuery),
+        searchTracks(queries.movieHitsQuery),
+        searchTracks(queries.melodiesQuery),
       ]);
 
-      final List<SongModel> trending = _mapVideosToSongs(results[0], "Trending");
-      final List<SongModel> movieHits = _mapVideosToSongs(results[1], "Soundtracks");
-      final List<SongModel> melodies = _mapVideosToSongs(results[2], "Hits");
+      final trending = results[0];
+      final movieHits = results[1];
+      final melodies = results[2];
 
       final data = LanguageHomeData(
         language: language,
         trending: trending,
         movieHits: movieHits,
-        topPicks: melodies,
+        topPicks: melodies.isNotEmpty ? melodies : trending,
         artists: queries.popularArtists,
       );
 
-      _languageCache[language] = data;
+      if (trending.isNotEmpty || movieHits.isNotEmpty || melodies.isNotEmpty) {
+        _languageCache[language] = data;
+      }
       return data;
     } catch (e) {
       printERROR("Error fetching language sections for $language", e);
@@ -180,87 +298,69 @@ class MusicServices extends getx.GetxService {
         trending: [],
         movieHits: [],
         topPicks: [],
-        artists: [],
-      );
-    } finally {
-      yt.close();
-    }
-  }
-
-  List<SongModel> _mapVideosToSongs(Iterable<Video> searchList, String category) {
-    final List<SongModel> songs = [];
-    for (final video in searchList) {
-      if (video.isLive) continue;
-      songs.add(
-        SongModel(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          album: category,
-          artUri: video.thumbnails.highResUrl,
-          duration: video.duration ?? const Duration(minutes: 3, seconds: 30),
-          extras: {
-            'views': video.engagement.viewCount,
-            'uploadDate': video.uploadDate?.toIso8601String(),
-          },
-        ),
+        artists: _getQueriesForLanguage(language).popularArtists,
       );
     }
-    return songs;
   }
 
   LanguageQueries _getQueriesForLanguage(String language) {
     switch (language.toLowerCase()) {
       case 'malayalam':
         return LanguageQueries(
-          trendingQuery: "Latest Malayalam trending songs 2025 2026 hits",
+          trendingQuery: "Latest Malayalam trending songs 2025 hits",
           movieHitsQuery: "New Malayalam movie songs audio hits",
           melodiesQuery: "Best Malayalam melody songs playlist hits",
-          popularArtists: ["Sushin Shyam", "Anirudh", "Vineeth Sreenivasan", "K.J. Yesudas", "KS Chithra", "Shaan Rahman"],
+          popularArtists: ["Sushin Shyam", "Vineeth Sreenivasan", "Anirudh", "K.J. Yesudas", "KS Chithra", "Shaan Rahman"],
         );
       case 'tamil':
         return LanguageQueries(
-          trendingQuery: "Latest Tamil trending songs 2025 2026 hits",
+          trendingQuery: "Latest Tamil trending songs 2025 hits",
           movieHitsQuery: "New Tamil movie songs audio jukebox",
           melodiesQuery: "Best Tamil melody songs playlist hits",
           popularArtists: ["Anirudh Ravichander", "A.R. Rahman", "Harris Jayaraj", "Yuvan Shankar Raja", "Sid Sriram", "Dhibu Ninan"],
         );
       case 'hindi':
         return LanguageQueries(
-          trendingQuery: "Latest Bollywood trending songs 2025 2026 hits",
+          trendingQuery: "Latest Bollywood trending songs 2025 hits",
           movieHitsQuery: "New Hindi movie songs audio hits",
           melodiesQuery: "Best Hindi romantic melody songs playlist",
           popularArtists: ["Arijit Singh", "Shreya Ghoshal", "Pritam", "Vishal-Shekhar", "Atif Aslam", "Armaan Malik"],
         );
       case 'telugu':
         return LanguageQueries(
-          trendingQuery: "Latest Telugu trending songs 2025 2026 hits",
+          trendingQuery: "Latest Telugu trending songs 2025 hits",
           movieHitsQuery: "New Telugu movie songs audio hits",
           melodiesQuery: "Best Telugu melody songs playlist hits",
           popularArtists: ["Thaman S", "Devi Sri Prasad", "Sid Sriram", "Anurag Kulkarni", "Armaan Malik", "Ram Miriyala"],
         );
       case 'kannada':
         return LanguageQueries(
-          trendingQuery: "Latest Kannada trending songs 2025 2026 hits",
+          trendingQuery: "Latest Kannada trending songs 2025 hits",
           movieHitsQuery: "New Kannada movie songs audio hits",
           melodiesQuery: "Best Kannada melody songs playlist",
           popularArtists: ["Ravi Basrur", "Arjun Janya", "Charan Raj", "Sanjith Hegde", "Vijay Prakash"],
         );
       case 'punjabi':
         return LanguageQueries(
-          trendingQuery: "Latest Punjabi trending songs 2025 2026 hits",
+          trendingQuery: "Latest Punjabi trending songs 2025 hits",
           movieHitsQuery: "Top Punjabi pop music hits",
           melodiesQuery: "Best Punjabi romantic songs",
           popularArtists: ["Diljit Dosanjh", "Karan Aujla", "AP Dhillon", "Shubh", "Sidhu Moose Wala", "Guru Randhawa"],
         );
       case 'english':
-      case 'global':
-      default:
         return LanguageQueries(
-          trendingQuery: "Top trending songs Billboard global hits 2026",
+          trendingQuery: "Top trending songs Billboard global hits 2025",
           movieHitsQuery: "Top soundtrack songs popular hits",
           melodiesQuery: "Chill acoustic pop melodies playlist hits",
           popularArtists: ["The Weeknd", "Taylor Swift", "Ed Sheeran", "Dua Lipa", "Bruno Mars", "Billie Eilish"],
+        );
+      case 'trending':
+      default:
+        return LanguageQueries(
+          trendingQuery: "Trending global songs top music hits 2025",
+          movieHitsQuery: "Popular movie soundtrack songs 2025",
+          melodiesQuery: "Top global chill acoustic melody songs",
+          popularArtists: ["The Weeknd", "Taylor Swift", "Anirudh", "Arijit Singh", "Ed Sheeran", "Dua Lipa"],
         );
     }
   }
@@ -301,4 +401,3 @@ class LanguageQueries {
     required this.popularArtists,
   });
 }
-

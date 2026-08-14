@@ -8,7 +8,7 @@ import '../utils/helper.dart';
 /// Piped proxies requests through their servers, so the URLs work from any IP.
 /// Public instances: https://piped-instances.kavin.rocks/
 class PipedStreamService {
-  static const List<String> _instances = [
+  static const List<String> pipedInstances = [
     'https://pipedapi.kavin.rocks',
     'https://pipedapi.adminforge.de',
     'https://piped-api.garudalinux.org',
@@ -23,7 +23,7 @@ class PipedStreamService {
 
   /// Fetches the best audio stream URL for a given YouTube video ID via Piped
   static Future<PipedStreamResult> fetchAudioUrl(String videoId) async {
-    for (final instance in _instances) {
+    for (final instance in pipedInstances) {
       try {
         printINFO('Trying Piped instance: $instance for $videoId');
         final response = await _dio.get('$instance/streams/$videoId');

@@ -355,6 +355,49 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
+
+                // ── Empty State / Error Fallback ─────────────────────────────
+                if (_homeData != null &&
+                    _homeData!.trending.isEmpty &&
+                    _homeData!.movieHits.isEmpty &&
+                    _homeData!.topPicks.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.cardBorder),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.refresh_rounded, color: AppTheme.primaryAccent, size: 36),
+                          const SizedBox(height: 12),
+                          Text(
+                            "Could not load $_selectedLanguage hits",
+                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            "Tap below to refresh and load songs",
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12.5),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => _loadLanguageContent(_selectedLanguage),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text("Retry"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
 
               // ── SECTION 5: Recently Played (with Clear All) ────────────────
