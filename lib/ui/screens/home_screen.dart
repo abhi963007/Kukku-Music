@@ -666,7 +666,70 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  static final Map<String, String> _artistImageMap = {
+    // English & Global
+    "the weeknd": "https://lh3.googleusercontent.com/U-SAmNOu4TynE818gLCfKsuHZ0U5YNEtO9mrjSI9WCCKERs98LzrCal5kajBBTQNwdcisoB2Bn-pHp4=w300-h300-l90-rj",
+    "taylor swift": "https://yt3.googleusercontent.com/OhxDTHQOQzSrcdgH9hzqzp1v22GYDE-QKnkryvCeq4ddx-3K3_c8oDXN0E6NvHlMn1q4XV59aHr0oL4f=w300-h300-l90-rj",
+    "ed sheeran": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "dua lipa": "https://lh3.googleusercontent.com/U-SAmNOu4TynE818gLCfKsuHZ0U5YNEtO9mrjSI9WCCKERs98LzrCal5kajBBTQNwdcisoB2Bn-pHp4=w300-h300-l90-rj",
+    "bruno mars": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "billie eilish": "https://yt3.googleusercontent.com/OhxDTHQOQzSrcdgH9hzqzp1v22GYDE-QKnkryvCeq4ddx-3K3_c8oDXN0E6NvHlMn1q4XV59aHr0oL4f=w300-h300-l90-rj",
+
+    // Malayalam
+    "sushin shyam": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "vineeth sreenivasan": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "k.j. yesudas": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "ks chithra": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "shaan rahman": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+
+    // Tamil
+    "anirudh": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "anirudh ravichander": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "a.r. rahman": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "harris jayaraj": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "yuvan shankar raja": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "sid sriram": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "dhibu ninan": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+
+    // Hindi
+    "arijit singh": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "shreya ghoshal": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "pritam": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "atif aslam": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "armaan malik": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "vishal-shekhar": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+
+    // Telugu
+    "thaman s": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "devi sri prasad": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "anurag kulkarni": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "ram miriyala": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+
+    // Kannada
+    "ravi basrur": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "arjun janya": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "charan raj": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "sanjith hegde": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "vijay prakash": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+
+    // Punjabi
+    "diljit dosanjh": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+    "karan aujla": "https://lh3.googleusercontent.com/U-SAmNOu4TynE818gLCfKsuHZ0U5YNEtO9mrjSI9WCCKERs98LzrCal5kajBBTQNwdcisoB2Bn-pHp4=w300-h300-l90-rj",
+    "ap dhillon": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "shubh": "https://yt3.googleusercontent.com/isgoBrKE_FX5f7p62FOWXZhF6XaIxghoNgn_DfEN4UpzDk6HhyEvR0TIg1xAdBG3_bWRlV9gY5XPnFQW=w300-h300-l90-rj",
+    "sidhu moose wala": "https://yt3.googleusercontent.com/ingY7G2yKmQk8H-QQ0CT8GbzKH9OxWrUNxsJQf7oG6ics1X4MY8qZSLzwKpSCGVpLjc_6KEu_JZOB1Y=w300-h300-l90-rj",
+    "guru randhawa": "https://lh3.googleusercontent.com/W_yOqnKSDYyeVOY_AsXhuAtb6rW3vCL3GtJ9DA1GxWOrJfyeSOqzvTv_TkFHijdkVPXWutASBlRFPg=w300-h300-l90-rj",
+  };
+
+  String _getArtistImage(String name) {
+    final key = name.trim().toLowerCase();
+    return _artistImageMap[key] ??
+        "https://api.dicebear.com/7.x/identicon/png?seed=${Uri.encodeComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf";
+  }
+
   Widget _buildArtistAvatar(String artistName) {
+    final imageUrl = _getArtistImage(artistName);
+
     return GestureDetector(
       onTap: () {
         // Trigger search for this artist and navigate to search tab
@@ -681,28 +744,53 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             Container(
-              width: 60,
-              height: 60,
+              padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.surfaceLight,
-                border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF2C223E), Color(0xFF1E1729)],
+                  colors: [AppTheme.primary, AppTheme.secondary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.person_rounded, color: AppTheme.primaryAccent, size: 28),
+              child: ClipOval(
+                child: SizedBox(
+                  width: 58,
+                  height: 58,
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: AppTheme.surfaceLight,
+                      child: const Center(
+                        child: Icon(Icons.person_rounded, color: AppTheme.primaryAccent, size: 24),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: AppTheme.surfaceLight,
+                      child: const Center(
+                        child: Icon(Icons.person_rounded, color: AppTheme.primaryAccent, size: 24),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               artistName,
               maxLines: 1,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: AppTheme.textSecondary,
+                color: Colors.white70,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
               ),
