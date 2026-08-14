@@ -60,11 +60,11 @@ class SearchViewController extends GetxController {
   }
 
   void _saveSearchQuery(String query) {
-    if (!recentSearches.contains(query)) {
-      recentSearches.insert(0, query);
-      if (recentSearches.length > 10) recentSearches.removeLast();
-      Hive.box('AppPrefs').put('recentSearchQueries', recentSearches.toList());
-    }
+    if (query.trim().isEmpty) return;
+    recentSearches.remove(query.trim());
+    recentSearches.insert(0, query.trim());
+    if (recentSearches.length > 25) recentSearches.removeLast();
+    Hive.box('AppPrefs').put('recentSearchQueries', recentSearches.toList());
   }
 
   void clearSearch() {
@@ -76,5 +76,10 @@ class SearchViewController extends GetxController {
   void removeRecentSearch(String query) {
     recentSearches.remove(query);
     Hive.box('AppPrefs').put('recentSearchQueries', recentSearches.toList());
+  }
+
+  void clearAllRecentSearches() {
+    recentSearches.clear();
+    Hive.box('AppPrefs').put('recentSearchQueries', <String>[]);
   }
 }
