@@ -26,7 +26,7 @@ class MiniPlayer extends StatelessWidget {
       final progress = total > 0 ? (pos / total).clamp(0.0, 1.0) : 0.0;
 
       return Material(
-        color: const Color(0xFF141720),
+        color: AppTheme.surface,
         child: InkWell(
           onTap: () {
             Get.to(
@@ -37,7 +37,7 @@ class MiniPlayer extends StatelessWidget {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF141720),
+              color: AppTheme.surface,
               border: Border(
                 top: BorderSide(
                   color: Colors.white.withOpacity(0.08),

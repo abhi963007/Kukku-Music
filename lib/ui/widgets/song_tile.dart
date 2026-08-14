@@ -184,9 +184,9 @@ class SongTile extends StatelessWidget {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                                Icon(Icons.delete_outline_rounded, size: 18, color: AppTheme.textSecondary),
                                 SizedBox(width: 10),
-                                Text("Remove Download", style: TextStyle(color: Colors.redAccent)),
+                                Text("Remove Download", style: TextStyle(color: AppTheme.textSecondary)),
                               ],
                             ),
                           ),
@@ -195,9 +195,9 @@ class SongTile extends StatelessWidget {
                             value: 'remove_recent',
                             child: Row(
                               children: [
-                                Icon(Icons.history_toggle_off_rounded, size: 18, color: Colors.orangeAccent),
+                                Icon(Icons.history_toggle_off_rounded, size: 18, color: AppTheme.textSecondary),
                                 SizedBox(width: 10),
-                                Text("Remove from History", style: TextStyle(color: Colors.orangeAccent)),
+                                Text("Remove from History", style: TextStyle(color: AppTheme.textSecondary)),
                               ],
                             ),
                           ),

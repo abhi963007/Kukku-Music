@@ -730,7 +730,7 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
-            Icon(Icons.history_toggle_off_rounded, color: Colors.orangeAccent, size: 22),
+            Icon(Icons.history_toggle_off_rounded, color: AppTheme.textSecondary, size: 22),
             SizedBox(width: 10),
             Text("Clear Recent Songs?", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
           ],
@@ -746,7 +746,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent.withOpacity(0.8),
+              backgroundColor: Colors.white.withOpacity(0.12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
