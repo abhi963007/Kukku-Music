@@ -18,8 +18,34 @@ class StreamProvider {
   static Future<StreamProvider> fetch(String videoId) async {
     final yt = YoutubeExplode();
     try {
-      final manifest = await yt.videos.streamsClient.getManifest(videoId);
-      final audioStreams = manifest.audioOnly.toList();
+      StreamManifest? manifest;
+
+      // Tier 1: Try default yt-explode manifest resolution
+      try {
+        manifest = await yt.videos.streamsClient.getManifest(videoId);
+      } catch (e) {
+        printERROR("Default yt-explode manifest failed for $videoId", e);
+      }
+
+      // Tier 2: Try specific fallback clients if default failed or empty
+      if (manifest == null || manifest.audioOnly.isEmpty) {
+        final fallbackClients = [
+          YoutubeApiClient.androidVr,
+          YoutubeApiClient.ios,
+          YoutubeApiClient.mweb,
+          YoutubeApiClient.safari,
+        ];
+        for (final client in fallbackClients) {
+          try {
+            manifest = await yt.videos.streamsClient.getManifest(videoId, ytClients: [client]);
+            if (manifest.audioOnly.isNotEmpty) break;
+          } catch (_) {
+            continue;
+          }
+        }
+      }
+
+      final audioStreams = manifest?.audioOnly.toList() ?? [];
 
       if (audioStreams.isEmpty) {
         return StreamProvider(
