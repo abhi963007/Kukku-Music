@@ -20,18 +20,17 @@ class StreamProvider {
     String? songTitle,
     String? artistName,
   }) async {
+    // ── Tier 1: Fast direct YouTube Explode stream extraction (~1s) ──────────
     final yt = YoutubeExplode();
     try {
       StreamManifest? manifest;
 
-      // Tier 1: Try default yt-explode manifest resolution
       try {
         manifest = await yt.videos.streamsClient.getManifest(videoId);
       } catch (e) {
         printERROR("Default yt-explode manifest failed for $videoId", e);
       }
 
-      // Tier 2: Try specific fallback clients if default failed or empty
       if (manifest == null || manifest.audioOnly.isEmpty) {
         final fallbackClients = [
           YoutubeApiClient.androidVr,
@@ -73,6 +72,7 @@ class StreamProvider {
           );
         }).toList();
 
+        printINFO("YoutubeExplode resolved ${formats.length} streams for $videoId");
         return StreamProvider(
           playable: true,
           statusMSG: "OK",
@@ -85,7 +85,7 @@ class StreamProvider {
       yt.close();
     }
 
-    // Tier 3: Fallback via Piped, Invidious, and JioSaavn high-quality CDN
+    // ── Tier 2: Fallback via JioSaavn / Piped / Invidious ─────────────────────
     try {
       final fallbackRes = await PipedStreamService.fetchAudioUrl(
         videoId,
@@ -93,6 +93,7 @@ class StreamProvider {
         artist: artistName,
       );
       if (fallbackRes.playable && fallbackRes.audio != null) {
+        printINFO("Fallback stream resolved for $videoId");
         return StreamProvider(
           playable: true,
           statusMSG: "OK",

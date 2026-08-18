@@ -8,6 +8,7 @@ import 'package:hive/hive.dart';
 import '../models/song_model.dart';
 import '../utils/helper.dart';
 import 'piped_stream_service.dart';
+import 'saavn_service.dart';
 
 enum AudioQuality {
   Low,
@@ -103,14 +104,22 @@ class MusicServices extends getx.GetxService {
     return null;
   }
 
-  /// Search tracks using direct YouTube Music InnerTube endpoint with Piped fallback
+  /// Search tracks with direct 320kbps CDNs using SaavnService as primary
   Future<List<SongModel>> searchTracks(String query) async {
     if (query.trim().isEmpty) return [];
 
+    // 1. Direct JioSaavn search with embedded 320kbps CDN stream URLs
+    try {
+      final saavnResults = await SaavnService.searchSongs(query);
+      if (saavnResults.isNotEmpty) return saavnResults;
+    } catch (e) {
+      printERROR("SaavnService search failed for: $query", e);
+    }
+
+    // 2. YouTube Music InnerTube fallback
     try {
       final body = Map.of(_context);
       body['query'] = query;
-      // Filter for individual song tracks only (avoids playlists, compilations, and albums)
       body['params'] = 'EgWKAQIIAWoKEAkQChAFEAMQBA%3D%3D';
 
       final response = await dio.post(
@@ -125,7 +134,7 @@ class MusicServices extends getx.GetxService {
       printERROR("InnerTube search failed for query: $query, attempting fallback", e);
     }
 
-    // Piped fallback search
+    // 3. Piped fallback search
     try {
       return await _searchPiped(query);
     } catch (e) {

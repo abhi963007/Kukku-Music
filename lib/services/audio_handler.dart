@@ -1,10 +1,8 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
@@ -14,9 +12,8 @@ import '../models/audio.dart';
 import '../models/song_model.dart';
 import '../models/streaming_data.dart';
 import '../utils/helper.dart';
-import 'background_task.dart';
 import 'music_service.dart';
-import 'piped_stream_service.dart';
+import 'saavn_service.dart';
 import 'stream_service.dart';
 
 Future<AudioHandler> initAudioService() async {
@@ -180,15 +177,12 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       return AudioSource.file(path, tag: item);
     }
 
-    // Remote stream → AudioSource.uri with standard browser user-agent header
-    printINFO('Playing via AudioSource.uri');
+    // Direct 320kbps MP4/AAC audio stream from high-speed CDN
+    printINFO('Playing audio stream: $url');
     isPlayingUsingLockCachingSource = false;
     return AudioSource.uri(
       Uri.parse(url),
       tag: item,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
     );
   }
 
@@ -202,7 +196,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }) async {
     printINFO('checkNGetUrl: $songId (fresh=$generateNewUrl, title=$title, artist=$artist)');
 
-    // 1. Cached song on disk (from LockCachingAudioSource auto-cache)
+    // 1. Cached song on disk
     if (!offlineReplacementUrl) {
       final cacheBox = Hive.box('SongsCache');
       if (cacheBox.containsKey(songId)) {
@@ -255,7 +249,6 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
             lowQualityAudio: audio,
           );
         }
-        // file missing → fall through to stream
         return checkNGetUrl(songId, offlineReplacementUrl: true, title: title, artist: artist);
       }
     }
@@ -277,34 +270,39 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       }
     }
 
-    // 4. Fetch fresh stream via youtube_explode_dart & multi-source fallback
+    // 4. Resolve direct 320kbps stream via SaavnService (fastest) or StreamProvider
     if (streamInfo == null || !streamInfo.playable) {
-      printINFO('Fetching stream for $songId');
-      try {
-        final token = RootIsolateToken.instance;
-        final streamInfoJson = await Isolate.run(
-          () => getStreamInfo(songId, token, title, artist),
-        );
-        streamInfo = HMStreamingData.fromJson(streamInfoJson);
-      } catch (e) {
-        printERROR('Isolate getStreamInfo failed for $songId, running in main isolate', e);
-        try {
-          final res = await StreamProvider.fetch(songId, songTitle: title, artistName: artist);
-          streamInfo = HMStreamingData.fromJson(res.hmStreamingData);
-        } catch (_) {}
-      }
-
-      // 5. If still unplayable or missing activeAudio, fallback directly to Piped/Invidious/Saavn
-      if (streamInfo == null || !streamInfo.playable || streamInfo.activeAudio == null) {
-        printINFO('Trying direct Piped/Invidious/Saavn fallback for $songId (title: $title, artist: $artist)');
-        final fallbackResult = await PipedStreamService.fetchAudioUrl(songId, title: title, artist: artist);
-        if (fallbackResult.playable && fallbackResult.audio != null) {
+      if (title != null && title.isNotEmpty) {
+        printINFO('Resolving direct 320kbps stream for $title via SaavnService');
+        final saavnUrl = await SaavnService.resolveAudioUrl(title, artist);
+        if (saavnUrl != null && saavnUrl.isNotEmpty) {
+          final audio = Audio(
+            itag: 140,
+            audioCodec: Codec.mp4a,
+            bitrate: 320000,
+            duration: 0,
+            loudnessDb: 0,
+            url: saavnUrl,
+            size: 0,
+          );
           streamInfo = HMStreamingData(
             playable: true,
             statusMSG: 'OK',
-            highQualityAudio: fallbackResult.audio,
-            lowQualityAudio: fallbackResult.audio,
+            highQualityAudio: audio,
+            lowQualityAudio: audio,
           );
+        }
+      }
+
+      if (streamInfo == null || !streamInfo.playable) {
+        printINFO('Fetching stream for $songId via StreamProvider');
+        try {
+          final res = await StreamProvider.fetch(songId, songTitle: title, artistName: artist);
+          if (res.playable) {
+            streamInfo = HMStreamingData.fromJson(res.hmStreamingData);
+          }
+        } catch (e) {
+          printERROR('StreamProvider.fetch failed for $songId', e);
         }
       }
 
@@ -324,7 +322,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     );
   }
 
-  // ── Core: Play song at index (Harmony's playByIndex pattern) ─────────────
+  // ── Core: Play song at index ─────────────────────────────────────────────
   Future<void> _playSongAtIndex(int index, {bool generateNewUrl = false}) async {
     if (index < 0 || index >= queue.value.length) return;
 
@@ -344,13 +342,28 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     mediaItem.add(currentSong);
 
-    // Resolve stream URL
-    final streamInfo = await checkNGetUrl(
-      currentSong.id,
-      generateNewUrl: generateNewUrl,
-      title: currentSong.title,
-      artist: currentSong.artist,
-    );
+    // 1. Check if direct 320kbps URL is already attached in song extras
+    String? streamUrl = currentSong.extras?['url'] as String?;
+
+    // 2. If missing or fresh URL requested, resolve directly via SaavnService (fast 320kbps)
+    if (streamUrl == null || streamUrl.isEmpty || generateNewUrl) {
+      if (currentSong.title.isNotEmpty) {
+        streamUrl = await SaavnService.resolveAudioUrl(currentSong.title, currentSong.artist);
+      }
+    }
+
+    // 3. If still missing, fallback to checkNGetUrl
+    if (streamUrl == null || streamUrl.isEmpty) {
+      final streamInfo = await checkNGetUrl(
+        currentSong.id,
+        generateNewUrl: generateNewUrl,
+        title: currentSong.title,
+        artist: currentSong.artist,
+      );
+      if (streamInfo.playable && streamInfo.activeAudio != null) {
+        streamUrl = streamInfo.activeAudio!.url;
+      }
+    }
 
     // Guard: if index changed while awaiting, abort
     if (index != _currentIndex) {
@@ -358,37 +371,30 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       return;
     }
 
-    if (!streamInfo.playable || streamInfo.activeAudio == null || streamInfo.activeAudio!.url.isEmpty) {
+    if (streamUrl == null || streamUrl.isEmpty) {
       currentSongUrl = null;
       isSongLoading = false;
       _isTransitioning = false;
       playbackState.add(playbackState.value.copyWith(
         processingState: AudioProcessingState.error,
-        errorMessage: streamInfo.statusMSG,
+        errorMessage: 'Unable to resolve audio stream',
       ));
-      printERROR('Cannot play: ${streamInfo.statusMSG}');
+      printERROR('Cannot play: Unable to resolve audio stream');
       return;
     }
 
-    // Attach URL to the MediaItem extras (Harmony pattern)
-    currentSongUrl = streamInfo.activeAudio!.url;
+    // Attach 320kbps URL to the MediaItem extras
+    currentSongUrl = streamUrl;
     currentSong.extras!['url'] = currentSongUrl;
-    currentSong.extras!['bitrate'] = streamInfo.activeAudio!.bitrate;
-    currentSong.extras!['codec'] = streamInfo.activeAudio!.audioCodec.name;
-
-    if (streamInfo.activeAudio!.duration > 0 &&
-        (currentSong.duration == null || currentSong.duration! <= const Duration(seconds: 1))) {
-      currentSong = currentSong.copyWith(
-        duration: Duration(milliseconds: streamInfo.activeAudio!.duration),
-      );
-      mediaItem.add(currentSong);
-    }
+    currentSong.extras!['bitrate'] = 320000;
+    currentSong.extras!['codec'] = 'MP4A';
+    mediaItem.add(currentSong);
 
     playbackState.add(
       playbackState.value.copyWith(queueIndex: _currentIndex),
     );
 
-    // Add to player and play
+    // Add to player and play immediately
     try {
       final audioSource = _createAudioSource(currentSong);
       await _player.setAudioSource(audioSource, preload: true);

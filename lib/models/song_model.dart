@@ -103,3 +103,55 @@ class MediaItemBuilder {
     );
   }
 }
+
+class AlbumModel {
+  final String id;
+  final String title;
+  final String artist;
+  final String artUri;
+  final String year;
+  final String language;
+  final int songCount;
+  final List<SongModel> songs;
+
+  AlbumModel({
+    required this.id,
+    required this.title,
+    required this.artist,
+    required this.artUri,
+    this.year = '',
+    this.language = '',
+    this.songCount = 0,
+    this.songs = const [],
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'artist': artist,
+      'artUri': artUri,
+      'year': year,
+      'language': language,
+      'songCount': songCount,
+      'songs': songs.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory AlbumModel.fromJson(dynamic json) {
+    if (json == null) {
+      return AlbumModel(id: '', title: '', artist: '', artUri: '');
+    }
+    final rawSongs = json['songs'] as List? ?? [];
+    return AlbumModel(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      artist: json['artist']?.toString() ?? '',
+      artUri: json['artUri']?.toString() ?? '',
+      year: json['year']?.toString() ?? '',
+      language: json['language']?.toString() ?? '',
+      songCount: int.tryParse(json['songCount']?.toString() ?? '0') ?? 0,
+      songs: rawSongs.map((e) => SongModel.fromJson(e)).toList(),
+    );
+  }
+}
