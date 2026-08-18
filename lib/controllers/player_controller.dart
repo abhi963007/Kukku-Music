@@ -1,9 +1,11 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 
 import '../models/song_model.dart';
 import '../services/audio_handler.dart';
+import '../ui/theme/app_theme.dart';
 
 class PlayerController extends GetxController {
   final MyAudioHandler audioHandler;
@@ -55,10 +57,23 @@ class PlayerController extends GetxController {
     // Playback state stream
     audioHandler.playbackState.listen((state) {
       isPlaying.value = state.playing;
-      isBuffering.value = state.processingState == AudioProcessingState.buffering ||
-          state.processingState == AudioProcessingState.loading;
+      isBuffering.value = (state.processingState == AudioProcessingState.buffering ||
+              state.processingState == AudioProcessingState.loading) &&
+          state.processingState != AudioProcessingState.error &&
+          state.processingState != AudioProcessingState.idle;
       position.value = state.updatePosition;
       bufferedPosition.value = state.bufferedPosition;
+
+      if (state.processingState == AudioProcessingState.error && state.errorMessage != null) {
+        Get.snackbar(
+          'Playback Error',
+          state.errorMessage ?? 'Unable to play track',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppTheme.surfaceLight,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
     });
 
     // Queue stream

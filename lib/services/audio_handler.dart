@@ -17,6 +17,7 @@ import '../utils/helper.dart';
 import 'background_task.dart';
 import 'music_service.dart';
 import 'piped_stream_service.dart';
+import 'stream_service.dart';
 
 Future<AudioHandler> initAudioService() async {
   return await AudioService.init(
@@ -33,13 +34,7 @@ Future<AudioHandler> initAudioService() async {
 }
 
 class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
-  // ── Harmony-style: persistent ConcatenatingAudioSource ──────────────────
-  final _playList = ConcatenatingAudioSource(
-    children: [],
-    useLazyPreparation: false,
-  );
-
-  // ── AudioPlayer with Harmony-style AndroidLoadControl ───────────────────
+  // ── AudioPlayer with AndroidLoadControl ───────────────────────────────────
   late final AudioPlayer _player;
 
   String _cacheDir = '';
@@ -58,10 +53,10 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     _player = AudioPlayer(
       audioLoadConfiguration: const AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
-          minBufferDuration: Duration(seconds: 50),
-          maxBufferDuration: Duration(minutes: 2),
+          minBufferDuration: Duration(seconds: 15),
+          maxBufferDuration: Duration(seconds: 60),
           bufferForPlaybackDuration: Duration(milliseconds: 500),
-          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 5),
+          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 2),
         ),
       ),
     );
@@ -94,13 +89,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     loopModeEnabled = appPrefsBox.get('isLoopModeEnabled', defaultValue: false) as bool;
     shuffleModeEnabled = appPrefsBox.get('isShuffleModeEnabled', defaultValue: false) as bool;
 
-    // Set the persistent playlist as the audio source (Harmony pattern)
-    try {
-      await _player.setAudioSource(_playList);
-    } catch (e) {
-      printERROR('Failed to set empty playlist source', e);
-    }
-
+    // Initialize playback listeners
     _notifyPlaybackEvents();
     _listenForDurationChanges();
     _listenForCompletion();
@@ -191,15 +180,15 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       return AudioSource.file(path, tag: item);
     }
 
-    // Remote stream → AudioSource.uri with NO custom headers
-    // YouTube stream URLs are self-authenticating (all auth tokens are in the URL).
-    // Adding headers interferes with ExoPlayer's DASH/segment loading.
-    // This is the same approach Harmony Music uses by default.
-    printINFO('Playing via AudioSource.uri (direct stream, no headers)');
+    // Remote stream → AudioSource.uri with standard browser user-agent header
+    printINFO('Playing via AudioSource.uri');
     isPlayingUsingLockCachingSource = false;
     return AudioSource.uri(
       Uri.parse(url),
       tag: item,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
     );
   }
 
@@ -208,8 +197,10 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     String songId, {
     bool generateNewUrl = false,
     bool offlineReplacementUrl = false,
+    String? title,
+    String? artist,
   }) async {
-    printINFO('checkNGetUrl: $songId (fresh=$generateNewUrl)');
+    printINFO('checkNGetUrl: $songId (fresh=$generateNewUrl, title=$title, artist=$artist)');
 
     // 1. Cached song on disk (from LockCachingAudioSource auto-cache)
     if (!offlineReplacementUrl) {
@@ -265,7 +256,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
           );
         }
         // file missing → fall through to stream
-        return checkNGetUrl(songId, offlineReplacementUrl: true);
+        return checkNGetUrl(songId, offlineReplacementUrl: true, title: title, artist: artist);
       }
     }
 
@@ -286,34 +277,51 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       }
     }
 
-    // 4. Fetch fresh stream via youtube_explode_dart (using anandnet's signature deciphering fork)
+    // 4. Fetch fresh stream via youtube_explode_dart & multi-source fallback
     if (streamInfo == null || !streamInfo.playable) {
-      printINFO('Fetching stream for $songId via youtube_explode_dart');
-      final token = RootIsolateToken.instance;
-      final streamInfoJson = await Isolate.run(() => getStreamInfo(songId, token));
-      streamInfo = HMStreamingData.fromJson(streamInfoJson);
+      printINFO('Fetching stream for $songId');
+      try {
+        final token = RootIsolateToken.instance;
+        final streamInfoJson = await Isolate.run(
+          () => getStreamInfo(songId, token, title, artist),
+        );
+        streamInfo = HMStreamingData.fromJson(streamInfoJson);
+      } catch (e) {
+        printERROR('Isolate getStreamInfo failed for $songId, running in main isolate', e);
+        try {
+          final res = await StreamProvider.fetch(songId, songTitle: title, artistName: artist);
+          streamInfo = HMStreamingData.fromJson(res.hmStreamingData);
+        } catch (_) {}
+      }
 
-      // 5. If unplayable or failed, fallback to Piped API
-      if (!streamInfo.playable || streamInfo.activeAudio == null) {
-        printINFO('youtube_explode failed, trying Piped API fallback for $songId');
-        final pipedResult = await PipedStreamService.fetchAudioUrl(songId);
-        if (pipedResult.playable && pipedResult.audio != null) {
+      // 5. If still unplayable or missing activeAudio, fallback directly to Piped/Invidious/Saavn
+      if (streamInfo == null || !streamInfo.playable || streamInfo.activeAudio == null) {
+        printINFO('Trying direct Piped/Invidious/Saavn fallback for $songId (title: $title, artist: $artist)');
+        final fallbackResult = await PipedStreamService.fetchAudioUrl(songId, title: title, artist: artist);
+        if (fallbackResult.playable && fallbackResult.audio != null) {
           streamInfo = HMStreamingData(
             playable: true,
             statusMSG: 'OK',
-            highQualityAudio: pipedResult.audio,
-            lowQualityAudio: pipedResult.audio,
+            highQualityAudio: fallbackResult.audio,
+            lowQualityAudio: fallbackResult.audio,
           );
         }
       }
 
-      if (streamInfo.playable) {
+      if (streamInfo != null && streamInfo.playable) {
         songsUrlCacheBox.put(songId, streamInfo.toJson());
       }
     }
 
-    streamInfo.setQualityIndex(qualityIndex);
-    return streamInfo;
+    if (streamInfo != null) {
+      streamInfo.setQualityIndex(qualityIndex);
+      return streamInfo;
+    }
+
+    return HMStreamingData(
+      playable: false,
+      statusMSG: 'Unable to resolve audio stream',
+    );
   }
 
   // ── Core: Play song at index (Harmony's playByIndex pattern) ─────────────
@@ -322,7 +330,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     _currentIndex = index;
     _isTransitioning = true;
-    final currentSong = queue.value[index];
+    MediaItem currentSong = queue.value[index];
 
     isSongLoading = true;
     playbackState.add(
@@ -334,15 +342,15 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       await _player.stop();
     } catch (_) {}
 
-    // Clear the playlist (Harmony pattern)
-    if (_playList.children.isNotEmpty) {
-      await _playList.clear();
-    }
-
     mediaItem.add(currentSong);
 
     // Resolve stream URL
-    final streamInfo = await checkNGetUrl(currentSong.id, generateNewUrl: generateNewUrl);
+    final streamInfo = await checkNGetUrl(
+      currentSong.id,
+      generateNewUrl: generateNewUrl,
+      title: currentSong.title,
+      artist: currentSong.artist,
+    );
 
     // Guard: if index changed while awaiting, abort
     if (index != _currentIndex) {
@@ -350,7 +358,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       return;
     }
 
-    if (!streamInfo.playable || streamInfo.activeAudio == null) {
+    if (!streamInfo.playable || streamInfo.activeAudio == null || streamInfo.activeAudio!.url.isEmpty) {
       currentSongUrl = null;
       isSongLoading = false;
       _isTransitioning = false;
@@ -368,24 +376,43 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     currentSong.extras!['bitrate'] = streamInfo.activeAudio!.bitrate;
     currentSong.extras!['codec'] = streamInfo.activeAudio!.audioCodec.name;
 
+    if (streamInfo.activeAudio!.duration > 0 &&
+        (currentSong.duration == null || currentSong.duration! <= const Duration(seconds: 1))) {
+      currentSong = currentSong.copyWith(
+        duration: Duration(milliseconds: streamInfo.activeAudio!.duration),
+      );
+      mediaItem.add(currentSong);
+    }
+
     playbackState.add(
       playbackState.value.copyWith(queueIndex: _currentIndex),
     );
 
-    // Add to playlist and play (Harmony pattern: _playList.add → _player.play)
-    await _playList.add(_createAudioSource(currentSong));
-    isSongLoading = false;
-    _isTransitioning = false;
+    // Add to player and play
+    try {
+      final audioSource = _createAudioSource(currentSong);
+      await _player.setAudioSource(audioSource, preload: true);
+      isSongLoading = false;
+      _isTransitioning = false;
 
-    // Always start from the beginning — prevents resuming a previously-played song mid-way
-    await _player.seek(Duration.zero);
-    await _player.play();
+      // Always start from the beginning
+      await _player.seek(Duration.zero);
+      await _player.play();
 
-    _addToRecentHistory(currentSong);
+      _addToRecentHistory(currentSong);
 
-    // If remaining queue is small (<= 3 songs), auto-replenish with continuous radio recommendations
-    if (_currentIndex >= queue.value.length - 3 || queue.value.length <= 4) {
-      _autoReplenishRadioQueue(currentSong.id);
+      // If remaining queue is small (<= 3 songs), auto-replenish with continuous radio recommendations
+      if (_currentIndex >= queue.value.length - 3 || queue.value.length <= 4) {
+        _autoReplenishRadioQueue(currentSong.id);
+      }
+    } catch (e) {
+      printERROR('Failed to start player for ${currentSong.id}', e);
+      isSongLoading = false;
+      _isTransitioning = false;
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.error,
+        errorMessage: 'Playback error: $e',
+      ));
     }
   }
 

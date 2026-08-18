@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../models/audio.dart';
 import '../utils/helper.dart';
+import 'piped_stream_service.dart';
 
 class StreamProvider {
   final bool playable;
@@ -15,7 +15,11 @@ class StreamProvider {
     this.statusMSG = "",
   });
 
-  static Future<StreamProvider> fetch(String videoId) async {
+  static Future<StreamProvider> fetch(
+    String videoId, {
+    String? songTitle,
+    String? artistName,
+  }) async {
     final yt = YoutubeExplode();
     try {
       StreamManifest? manifest;
@@ -32,6 +36,7 @@ class StreamProvider {
         final fallbackClients = [
           YoutubeApiClient.androidVr,
           YoutubeApiClient.ios,
+          YoutubeApiClient.tv,
           YoutubeApiClient.mweb,
           YoutubeApiClient.safari,
         ];
@@ -47,52 +52,61 @@ class StreamProvider {
 
       final audioStreams = manifest?.audioOnly.toList() ?? [];
 
-      if (audioStreams.isEmpty) {
+      if (audioStreams.isNotEmpty) {
+        final List<Audio> formats = audioStreams.map((e) {
+          final isMp4 = e.audioCodec.toLowerCase().contains('mp') ||
+              e.container.name.toLowerCase().contains('mp4') ||
+              e.container.name.toLowerCase().contains('m4a');
+
+          final durationMs = (e.size.totalBytes > 0 && e.bitrate.bitsPerSecond > 0)
+              ? (e.size.totalBytes / (e.bitrate.bitsPerSecond / 8) * 1000).toInt()
+              : 0;
+
+          return Audio(
+            itag: e.tag,
+            audioCodec: isMp4 ? Codec.mp4a : Codec.opus,
+            bitrate: e.bitrate.bitsPerSecond,
+            duration: durationMs,
+            loudnessDb: 0.0,
+            url: e.url.toString(),
+            size: e.size.totalBytes,
+          );
+        }).toList();
+
         return StreamProvider(
-          playable: false,
-          statusMSG: "No audio streams found for video",
+          playable: true,
+          statusMSG: "OK",
+          audioFormats: formats,
         );
       }
-
-      final List<Audio> formats = audioStreams.map((e) {
-        final isMp4 = e.audioCodec.toLowerCase().contains('mp') ||
-            e.container.name.toLowerCase().contains('mp4') ||
-            e.container.name.toLowerCase().contains('m4a');
-
-        return Audio(
-          itag: e.tag,
-          audioCodec: isMp4 ? Codec.mp4a : Codec.opus,
-          bitrate: e.bitrate.bitsPerSecond,
-          duration: (e.size.totalBytes / (e.bitrate.bitsPerSecond / 8) * 1000).toInt(),
-          loudnessDb: 0.0,
-          url: e.url.toString(),
-          size: e.size.totalBytes,
-        );
-      }).toList();
-
-      return StreamProvider(
-        playable: true,
-        statusMSG: "OK",
-        audioFormats: formats,
-      );
     } catch (e) {
       printERROR("StreamProvider fetch error for $videoId", e);
-      if (e is SocketException) {
-        return StreamProvider(playable: false, statusMSG: "networkError");
-      } else if (e is VideoUnplayableException) {
-        return StreamProvider(
-          playable: false,
-          statusMSG: e.message.isNotEmpty ? e.message : "Song is unplayable",
-        );
-      } else {
-        return StreamProvider(
-          playable: false,
-          statusMSG: "Failed to extract stream: ${e.toString()}",
-        );
-      }
     } finally {
       yt.close();
     }
+
+    // Tier 3: Fallback via Piped, Invidious, and JioSaavn high-quality CDN
+    try {
+      final fallbackRes = await PipedStreamService.fetchAudioUrl(
+        videoId,
+        title: songTitle,
+        artist: artistName,
+      );
+      if (fallbackRes.playable && fallbackRes.audio != null) {
+        return StreamProvider(
+          playable: true,
+          statusMSG: "OK",
+          audioFormats: [fallbackRes.audio!],
+        );
+      }
+    } catch (e) {
+      printERROR("Fallback stream error for $videoId", e);
+    }
+
+    return StreamProvider(
+      playable: false,
+      statusMSG: "Unable to retrieve audio stream",
+    );
   }
 
   Audio? get highestQualityAudio {
