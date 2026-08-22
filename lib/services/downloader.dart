@@ -1,12 +1,12 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
-import 'package:hive/hive.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../models/audio.dart';
 import '../models/song_model.dart';
 import '../utils/helper.dart';
+import 'storage_paths.dart';
 import 'stream_service.dart';
 
 class DownloaderService extends getx.GetxService {
@@ -14,31 +14,74 @@ class DownloaderService extends getx.GetxService {
   final getx.RxMap<String, int> downloadProgress = <String, int>{}.obs;
   final getx.RxSet<String> activeDownloads = <String>{}.obs;
 
+  /// Ids known to have a valid file on disk.
+  ///
+  /// This used to be answered by a synchronous `File.existsSync()` inside every
+  /// `SongTile`'s `Obx`, which hit the filesystem on every scroll frame and,
+  /// because it was not observable, never refreshed when a download finished.
+  final getx.RxSet<String> downloadedIds = <String>{}.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    refreshDownloadedIds();
+  }
+
   bool isDownloading(String songId) => activeDownloads.contains(songId);
+
   int getProgress(String songId) => downloadProgress[songId] ?? 0;
 
-  bool isDownloaded(String songId) {
-    final box = Hive.box('SongDownloads');
-    if (!box.containsKey(songId)) return false;
-    final data = box.get(songId);
-    final path = data['extras']?['url'] as String? ?? '';
-    return path.isNotEmpty && File(path).existsSync();
+  bool isDownloaded(String songId) => downloadedIds.contains(songId);
+
+  /// Rebuilds [downloadedIds] from Hive + disk. Cheap enough to call after a
+  /// download or delete, but never during a build.
+  void refreshDownloadedIds() {
+    final box = safeBox('SongDownloads');
+    if (box == null) {
+      downloadedIds.clear();
+      return;
+    }
+    final ids = <String>{};
+    for (final key in box.keys) {
+      final entry = asStringMap(box.get(key));
+      final path = _pathFromEntry(entry);
+      if (path.isNotEmpty && File(path).existsSync()) {
+        ids.add(key.toString());
+      }
+    }
+    downloadedIds
+      ..clear()
+      ..addAll(ids);
+  }
+
+  String _pathFromEntry(Map<String, dynamic> entry) {
+    final direct = asText(entry['url']);
+    if (direct.isNotEmpty) {
+      return direct.startsWith('file://') ? Uri.parse(direct).toFilePath() : direct;
+    }
+    final nested = asText(asStringMap(entry['extras'])['url']);
+    if (nested.isEmpty) return '';
+    return nested.startsWith('file://') ? Uri.parse(nested).toFilePath() : nested;
   }
 
   Future<bool> downloadSong(SongModel song) async {
+    if (song.id.isEmpty) return false;
     if (activeDownloads.contains(song.id)) return false;
 
+    String? partialPath;
     try {
       activeDownloads.add(song.id);
       downloadProgress[song.id] = 0;
 
-      final appPrefs = Hive.box('AppPrefs');
-      final downloadingFormat = appPrefs.get('downloadFormat', defaultValue: 'opus') as String;
+      final downloadingFormat = boxGet<String>('AppPrefs', 'downloadFormat', 'opus');
 
-      final playerResponse = await StreamProvider.fetch(song.id);
+      final playerResponse = await StreamProvider.fetch(
+        song.id,
+        songTitle: song.title,
+        artistName: song.artist,
+      );
       if (!playerResponse.playable) {
         printERROR("Failed to resolve stream for download of ${song.id}");
-        activeDownloads.remove(song.id);
         return false;
       }
 
@@ -48,44 +91,41 @@ class DownloaderService extends getx.GetxService {
 
       if (requiredAudioStream == null || requiredAudioStream.url.isEmpty) {
         printERROR("No valid audio format found to download for ${song.id}");
-        activeDownloads.remove(song.id);
         return false;
       }
 
-      final docDir = await getApplicationDocumentsDirectory();
-      final downloadsDir = Directory("${docDir.path}/downloads");
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
-      }
-
+      final downloadsDir = await StoragePaths.downloadsDir();
       final actualExt = requiredAudioStream.audioCodec == Codec.mp4a ? "m4a" : "opus";
       final safeTitle = cleanFilename("${song.title} - ${song.artist}");
-      final filePath = "${downloadsDir.path}/$safeTitle.$actualExt";
-
-      final headers = <String, dynamic>{};
-      if (requiredAudioStream.size > 0) {
-        headers['Range'] = 'bytes=0-${requiredAudioStream.size - 1}';
-      }
+      // Guard against an empty/duplicate filename after sanitising.
+      final baseName = safeTitle.isNotEmpty ? safeTitle : song.id;
+      final filePath = "${downloadsDir.path}/$baseName.$actualExt";
+      partialPath = filePath;
 
       await _dio.download(
         requiredAudioStream.url,
         filePath,
-        options: Options(headers: headers),
         onReceiveProgress: (count, total) {
           final totalBytes = total > 0 ? total : requiredAudioStream.size;
           if (totalBytes > 0) {
-            final percentage = ((count / totalBytes) * 100).clamp(0, 100).toInt();
-            downloadProgress[song.id] = percentage;
+            downloadProgress[song.id] =
+                ((count / totalBytes) * 100).clamp(0, 100).toInt();
           }
         },
       );
 
-      // Save to SongDownloads Hive Box
+      // A 0-byte file means the CDN returned an error body; treat it as failure.
+      final written = File(filePath);
+      if (!written.existsSync() || written.lengthSync() <= 0) {
+        printERROR("Download produced an empty file for ${song.id}");
+        return false;
+      }
+
       final updatedExtras = Map<String, dynamic>.from(song.extras);
       updatedExtras['url'] = filePath;
       updatedExtras['downloadedAt'] = DateTime.now().toIso8601String();
       updatedExtras['codec'] = actualExt;
-      updatedExtras['fileSize'] = requiredAudioStream.size;
+      updatedExtras['fileSize'] = written.lengthSync();
 
       final downloadedSong = SongModel(
         id: song.id,
@@ -97,8 +137,9 @@ class DownloaderService extends getx.GetxService {
         extras: updatedExtras,
       );
 
-      final downloadsBox = Hive.box("SongDownloads");
-      await downloadsBox.put(song.id, downloadedSong.toJson());
+      await boxPut('SongDownloads', song.id, downloadedSong.toJson());
+      downloadedIds.add(song.id);
+      partialPath = null;
 
       printINFO("Successfully downloaded and registered: $filePath");
       return true;
@@ -106,6 +147,16 @@ class DownloaderService extends getx.GetxService {
       printERROR("Download error for song: ${song.id}", e);
       return false;
     } finally {
+      // Never leave a half-written file behind: it would be reported as a valid
+      // download and then fail to play.
+      if (partialPath != null) {
+        try {
+          final partial = File(partialPath);
+          if (partial.existsSync()) partial.deleteSync();
+        } catch (e) {
+          printERROR('Failed to clean up partial download', e);
+        }
+      }
       activeDownloads.remove(song.id);
       downloadProgress.remove(song.id);
     }
@@ -113,18 +164,19 @@ class DownloaderService extends getx.GetxService {
 
   Future<void> deleteDownloadedSong(String songId) async {
     try {
-      final box = Hive.box("SongDownloads");
+      final box = safeBox('SongDownloads');
+      if (box == null) return;
       if (box.containsKey(songId)) {
-        final data = box.get(songId);
-        final filePath = data['extras']?['url'] as String? ?? '';
-        if (filePath.isNotEmpty) {
-          final file = File(filePath);
+        final path = _pathFromEntry(asStringMap(box.get(songId)));
+        if (path.isNotEmpty) {
+          final file = File(path);
           if (await file.exists()) {
             await file.delete();
           }
         }
         await box.delete(songId);
       }
+      downloadedIds.remove(songId);
     } catch (e) {
       printERROR("Error deleting downloaded song $songId", e);
     }

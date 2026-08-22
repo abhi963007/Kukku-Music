@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+// `show Color` only — dart:ui also exports a `Codec` that would clash with the
+// audio `Codec` enum below.
+import 'dart:ui' show Color;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -43,7 +46,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   late final AudioPlayer _player;
 
   bool isPlayingUsingLockCachingSource = false;
-  bool isSongLoading = true;
+  // Nothing is loading until a track is actually requested; starting at `true`
+  // published a spurious "loading" state to the notification on cold start.
+  bool isSongLoading = false;
   String? currentSongUrl;
 
   AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
@@ -231,10 +236,32 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// Bails out (surfacing an error state) rather than looping forever.
   bool _retrying = false;
 
+  /// Retries already attempted for [_retryKey]. A permanently dead source would
+  /// otherwise retry on every error event, forever.
+  static const int _maxRetriesPerTrack = 2;
+  String _retryKey = '';
+  int _retryCount = 0;
+
   Future<void> _retryCurrentWithFreshUrl() async {
     if (_retrying || _disposed) return;
     final q = queue.value;
     if (q.isEmpty || _currentIndex < 0 || _currentIndex >= q.length) return;
+
+    final key = q[_currentIndex].id;
+    if (_retryKey != key) {
+      _retryKey = key;
+      _retryCount = 0;
+    }
+    if (_retryCount >= _maxRetriesPerTrack) {
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.error,
+        errorMessage: 'Could not play "${q[_currentIndex].title}". Skipping.',
+      ));
+      // Move on instead of stalling on a track that cannot be resolved.
+      await skipToNext();
+      return;
+    }
+    _retryCount++;
 
     _retrying = true;
     try {
@@ -347,6 +374,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         final cachePath = await StoragePaths.cacheFilePathFor(item.id);
         printINFO('Playing cached stream: $url -> $cachePath');
         isPlayingUsingLockCachingSource = true;
+        // Marked experimental upstream but stable throughout just_audio 0.9.x,
+        // and the only built-in way to cache while streaming.
+        // ignore: experimental_member_use
         final source = LockCachingAudioSource(
           Uri.parse(url),
           cacheFile: File(cachePath),
@@ -368,6 +398,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// so the Library "Cached Songs" tab and offline replay can find it.
   void _trackCacheCompletion(
     MediaItem item,
+    // ignore: experimental_member_use
     LockCachingAudioSource source,
     String cachePath,
   ) {
@@ -396,6 +427,31 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   // ── Core: Resolve stream URL (3-tier cache: download → disk → network) ───
+
+  /// Disk-only lookup for a playable `file://` URL. Returns `null` when the
+  /// song is not available offline — never performs network I/O, so it is safe
+  /// to call on every track change.
+  Future<String?> _resolveOfflineUrl(String songId) async {
+    if (songId.isEmpty) return null;
+
+    // Completed stream cache.
+    final cacheFile = await StoragePaths.existingCacheFile(songId);
+    if (cacheFile != null) return cacheFile.uri.toString();
+
+    // User download.
+    final downloadEntry = asStringMap(boxGet<dynamic>('SongDownloads', songId, null));
+    if (downloadEntry.isEmpty) return null;
+
+    final path = asText(downloadEntry['url']).isNotEmpty
+        ? asText(downloadEntry['url'])
+        : asText(asStringMap(downloadEntry['extras'])['url']);
+    if (path.isEmpty) return null;
+
+    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    if (file.existsSync() && file.lengthSync() > 0) return file.uri.toString();
+    return null;
+  }
+
   Future<HMStreamingData> checkNGetUrl(
     String songId, {
     bool generateNewUrl = false,
@@ -578,17 +634,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     mediaItem.add(currentSong);
 
-    // 1. A local file (download or completed cache) always wins.
-    String? streamUrl;
-    final offline = await checkNGetUrl(
-      currentSong.id,
-      generateNewUrl: false,
-      title: null,
-      artist: null,
-    );
-    if (offline.playable && (offline.activeAudio?.url.startsWith('file://') ?? false)) {
-      streamUrl = offline.activeAudio!.url;
-    }
+    // 1. A local file (download or completed cache) always wins. This is a
+    //    disk-only lookup — it must never trigger a network round-trip.
+    String? streamUrl = await _resolveOfflineUrl(currentSong.id);
 
     // 2. Otherwise use the URL attached to the song, or re-resolve it.
     streamUrl ??= asText(currentSong.extras?['url']).isNotEmpty

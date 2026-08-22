@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
-import 'package:hive/hive.dart';
+
+import '../services/audio_handler.dart';
+import '../utils/helper.dart';
 
 class SettingsController extends GetxController {
-  final box = Hive.box('AppPrefs');
-
   final RxInt streamingQuality = 1.obs; // 0: Low (48-50kbps), 1: High (128-160kbps)
   final RxString downloadFormat = 'opus'.obs; // 'opus' or 'm4a'
   final RxBool cacheSongs = true.obs;
@@ -15,30 +15,45 @@ class SettingsController extends GetxController {
     _loadSettings();
   }
 
+  /// Reads with type coercion: a value written by an older build (or a corrupt
+  /// box) could be a `String` where an `int`/`bool` is expected, which used to
+  /// throw while assigning to the typed `Rx`.
   void _loadSettings() {
-    streamingQuality.value = box.get('streamingQuality', defaultValue: 1);
-    downloadFormat.value = box.get('downloadFormat', defaultValue: 'opus');
-    cacheSongs.value = box.get('cacheSongs', defaultValue: true);
-    contentLanguage.value = box.get('contentLanguage', defaultValue: 'en');
+    streamingQuality.value = asInt(boxGet<dynamic>('AppPrefs', 'streamingQuality', 1), 1)
+        .clamp(0, 1);
+    final format = asText(boxGet<dynamic>('AppPrefs', 'downloadFormat', 'opus'));
+    downloadFormat.value = (format == 'm4a' || format == 'opus') ? format : 'opus';
+    cacheSongs.value = asBool(boxGet<dynamic>('AppPrefs', 'cacheSongs', true), true);
+    final lang = asText(boxGet<dynamic>('AppPrefs', 'contentLanguage', 'en'));
+    contentLanguage.value = lang.isNotEmpty ? lang : 'en';
   }
 
-  void setStreamingQuality(int quality) {
-    streamingQuality.value = quality;
-    box.put('streamingQuality', quality);
+  Future<void> setStreamingQuality(int quality) async {
+    final clamped = quality.clamp(0, 1);
+    streamingQuality.value = clamped;
+    await boxPut('AppPrefs', 'streamingQuality', clamped);
   }
 
-  void setDownloadFormat(String format) {
+  Future<void> setDownloadFormat(String format) async {
+    if (format != 'opus' && format != 'm4a') return;
     downloadFormat.value = format;
-    box.put('downloadFormat', format);
+    await boxPut('AppPrefs', 'downloadFormat', format);
   }
 
-  void toggleCacheSongs(bool enabled) {
+  Future<void> toggleCacheSongs(bool enabled) async {
     cacheSongs.value = enabled;
-    box.put('cacheSongs', enabled);
+    await boxPut('AppPrefs', 'cacheSongs', enabled);
+    // Push the change to the running handler so it applies to the next track
+    // without an app restart.
+    if (Get.isRegistered<MyAudioHandler>()) {
+      await Get.find<MyAudioHandler>()
+          .customAction('setCacheEnabled', {'enabled': enabled});
+    }
   }
 
-  void setContentLanguage(String lang) {
+  Future<void> setContentLanguage(String lang) async {
+    if (lang.isEmpty) return;
     contentLanguage.value = lang;
-    box.put('contentLanguage', lang);
+    await boxPut('AppPrefs', 'contentLanguage', lang);
   }
 }

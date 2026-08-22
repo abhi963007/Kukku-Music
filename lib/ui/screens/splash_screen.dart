@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../theme/app_theme.dart';
 import 'main_navigation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -11,60 +13,83 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  /// Long enough to read as intentional branding, short enough not to feel like
+  /// a stall. The previous 2s was pure dead time.
+  static const Duration _minimumDisplay = Duration(milliseconds: 1100);
+
+  Timer? _timer;
+
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+
   @override
   void initState() {
     super.initState();
+    _timer = Timer(_minimumDisplay, _goToApp);
+  }
 
-    // Navigate to MainNavigationScreen after clean splash presentation
-    Timer(const Duration(milliseconds: 2000), () {
-      if (mounted) {
-        Get.off(
-          () => const MainNavigationScreen(),
-          transition: Transition.fadeIn,
-          duration: const Duration(milliseconds: 400),
-        );
-      }
-    });
+  void _goToApp() {
+    if (!mounted) return;
+    Get.off(
+      () => const MainNavigationScreen(),
+      transition: Transition.fadeIn,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _fade.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0D14),
-      body: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Centered Transparent App Icon (Large & Clean)
-          Center(
-            child: SizedBox(
-              width: 160,
-              height: 160,
-              child: Image.asset(
-                'assets/images/app_icon.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.music_note_rounded,
-                  size: 80,
-                  color: Colors.white,
+      // Matches AppTheme.background and the native splash colour, so there is no
+      // colour flash between the launch screen, this screen and the app.
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: FadeTransition(
+                opacity: _fade,
+                child: SizedBox(
+                  width: 160,
+                  height: 160,
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.music_note_rounded,
+                      size: 80,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-
-          // Bottom White Loading Spinner
-          const Positioned(
-            bottom: 60,
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            const Positioned(
+              bottom: 48,
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

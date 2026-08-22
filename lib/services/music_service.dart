@@ -3,7 +3,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
-import 'package:hive/hive.dart';
 
 import '../models/song_model.dart';
 import '../utils/helper.dart';
@@ -48,39 +47,43 @@ class MusicServices extends getx.GetxService {
   }
 
   Future<void> init() async {
-    final date = DateTime.now();
-    _context['context']['client']['clientVersion'] =
-        "1.${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.01.00";
-    final signatureTimestamp = getDatestamp() - 1;
-    _context['playbackContext'] = {
-      'contentPlaybackContext': {'signatureTimestamp': signatureTimestamp},
-    };
+    try {
+      final date = DateTime.now();
+      _context['context']['client']['clientVersion'] =
+          "1.${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.01.00";
+      final signatureTimestamp = getDatestamp() - 1;
+      _context['playbackContext'] = {
+        'contentPlaybackContext': {'signatureTimestamp': signatureTimestamp},
+      };
 
-    final appPrefsBox = Hive.box('AppPrefs');
-    hlCode = appPrefsBox.get('contentLanguage') ?? "en";
+      hlCode = asText(boxGet<dynamic>('AppPrefs', 'contentLanguage', 'en')).isNotEmpty
+          ? asText(boxGet<dynamic>('AppPrefs', 'contentLanguage', 'en'))
+          : 'en';
 
-    if (appPrefsBox.containsKey('visitorId')) {
-      final visitorData = appPrefsBox.get("visitorId");
-      if (visitorData != null &&
-          visitorData['exp'] != null &&
-          !isExpired(epoch: visitorData['exp'])) {
-        _headers['X-Goog-Visitor-Id'] = visitorData['id'];
-        printINFO("Loaded cached visitorId: ${visitorData['id']}");
+      final visitorData = asStringMap(boxGet<dynamic>('AppPrefs', 'visitorId', null));
+      final cachedId = asText(visitorData['id']);
+      final exp = asInt(visitorData['exp']);
+      if (cachedId.isNotEmpty && exp > 0 && !isExpired(epoch: exp)) {
+        _headers['X-Goog-Visitor-Id'] = cachedId;
+        printINFO("Loaded cached visitorId");
         return;
       }
-    }
 
-    final visitorId = await generateVisitorId();
-    if (visitorId != null) {
-      _headers['X-Goog-Visitor-Id'] = visitorId;
-      appPrefsBox.put("visitorId", {
-        'id': visitorId,
-        'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2592000
-      });
-      printINFO("Generated and cached visitorId: $visitorId");
-    } else {
-      _headers['X-Goog-Visitor-Id'] =
-          "CgttN24wcmd5UzNSWSi2lvq2BjIKCgJKUBIEGgAgYQ%3D%3D";
+      final visitorId = await generateVisitorId();
+      if (visitorId != null && visitorId.isNotEmpty) {
+        _headers['X-Goog-Visitor-Id'] = visitorId;
+        await boxPut('AppPrefs', 'visitorId', {
+          'id': visitorId,
+          'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2592000,
+        });
+        printINFO("Generated and cached visitorId");
+      } else {
+        _headers['X-Goog-Visitor-Id'] =
+            "CgttN24wcmd5UzNSWSi2lvq2BjIKCgJKUBIEGgAgYQ%3D%3D";
+      }
+    } catch (e) {
+      // A failed init must not prevent search from working via the fallbacks.
+      printERROR('MusicServices init failed', e);
     }
   }
 
@@ -372,11 +375,25 @@ class MusicServices extends getx.GetxService {
 
   /// Cache for language sections to make tab switching instantaneous
   final Map<String, LanguageHomeData> _languageCache = {};
+  final Map<String, DateTime> _languageCacheStamp = {};
 
-  /// Fetch categorized content for a specific language
-  Future<LanguageHomeData> getLanguageHomeSections(String language) async {
-    if (_languageCache.containsKey(language) && _languageCache[language]!.trending.isNotEmpty) {
-      return _languageCache[language]!;
+  /// How long a cached language section stays fresh.
+  static const Duration _cacheTtl = Duration(minutes: 30);
+
+  /// Fetch categorized content for a specific language.
+  ///
+  /// [forceRefresh] bypasses the in-memory cache — without it, pull-to-refresh
+  /// on the home screen returned the same cached payload and appeared to do
+  /// nothing.
+  Future<LanguageHomeData> getLanguageHomeSections(
+    String language, {
+    bool forceRefresh = false,
+  }) async {
+    final cached = _languageCache[language];
+    final stamp = _languageCacheStamp[language];
+    final isFresh = stamp != null && DateTime.now().difference(stamp) < _cacheTtl;
+    if (!forceRefresh && cached != null && cached.trending.isNotEmpty && isFresh) {
+      return cached;
     }
 
     try {
@@ -406,10 +423,13 @@ class MusicServices extends getx.GetxService {
 
       if (trending.isNotEmpty || movieHits.isNotEmpty || albums.isNotEmpty) {
         _languageCache[language] = data;
+        _languageCacheStamp[language] = DateTime.now();
       }
       return data;
     } catch (e) {
       printERROR("Error fetching language sections for $language", e);
+      // Prefer stale content over an empty screen when the network is down.
+      if (cached != null) return cached;
       return LanguageHomeData(
         language: language,
         trending: [],

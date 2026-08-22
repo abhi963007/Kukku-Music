@@ -17,17 +17,49 @@ android {
 
     defaultConfig {
         applicationId = "com.kukku.music.kukku"
+        // audio_service / just_audio (Media3) both require API 21+; Flutter's
+        // current floor is 24.
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        // Was pinned to 34, which opted the app out of the Android 15+
+        // edge-to-edge behaviour the UI now relies on. Track Flutter's default
+        // (36) instead of hardcoding a version that goes stale.
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: replace with a real upload keystore before publishing.
+            // Signing with the debug keys for now, so `flutter build --release`
+            // and `flutter run --release` work out of the box.
             signingConfig = signingConfigs.getByName("debug")
+
+            // R8 was never configured, so release builds shipped unshrunk and
+            // unobfuscated. proguard-rules.pro keeps the media classes that the
+            // platform instantiates reflectively.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+    }
+
+    packaging {
+        resources {
+            // Duplicate metadata from the Media3 / Kotlin artifacts.
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/*.kotlin_module",
+            )
         }
     }
 }

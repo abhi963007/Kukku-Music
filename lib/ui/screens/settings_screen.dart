@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -13,184 +11,49 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = Get.find<SettingsController>();
-    final downloadController = Get.find<DownloadViewController>();
-
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          children: [
-            const Text(
+          // The parent Scaffold reserves the mini player + nav bar space, so the
+          // old trailing 120px was just dead scroll.
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: const [
+            Text(
               "Settings",
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Section 1: Audio Playback Quality
-            _buildSectionHeader("Audio Streaming"),
-            Obx(() => Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.cardBorder),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      children: [
-                        RadioListTile<int>(
-                          value: 1,
-                          groupValue: settings.streamingQuality.value,
-                          title: const Text("High Quality (128-160 kbps)", style: TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Highest clarity with Opus itag 251 / AAC itag 140",
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                          activeColor: AppTheme.primary,
-                          onChanged: (val) => settings.setStreamingQuality(val ?? 1),
-                        ),
-                        const Divider(height: 1, color: Colors.white10),
-                        RadioListTile<int>(
-                          value: 0,
-                          groupValue: settings.streamingQuality.value,
-                          title: const Text("Data Saver (48-50 kbps)", style: TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Lowest data usage with Opus itag 249 / AAC itag 139",
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                          activeColor: AppTheme.primary,
-                          onChanged: (val) => settings.setStreamingQuality(val ?? 0),
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
-            const SizedBox(height: 24),
-
-            // Section 2: Offline Downloads
-            _buildSectionHeader("Downloads & Offline"),
-            Obx(() => Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.cardBorder),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          title: const Text("Download Format", style: TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                            settings.downloadFormat.value == "opus" ? "Opus (.opus) - Best Quality" : "M4A (.m4a) - High Compatibility",
-                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                          ),
-                          trailing: DropdownButton<String>(
-                            value: settings.downloadFormat.value,
-                            dropdownColor: AppTheme.surfaceLight,
-                            underline: const SizedBox.shrink(),
-                            items: const [
-                              DropdownMenuItem(value: "opus", child: Text("Opus")),
-                              DropdownMenuItem(value: "m4a", child: Text("M4A")),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) settings.setDownloadFormat(val);
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1, color: Colors.white10),
-                        SwitchListTile(
-                          value: settings.cacheSongs.value,
-                          activeColor: AppTheme.primary,
-                          title: const Text("Auto-Cache Streamed Tracks", style: TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: const Text("Saves songs to local disk during playback for instant offline replays",
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                          onChanged: (val) => settings.toggleCacheSongs(val),
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
-            const SizedBox(height: 24),
-
-            // Section 3: Storage & Cache Management
-            _buildSectionHeader("Storage & Cache"),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorder),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Current Stream Cache Size", style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-                      Obx(() => Text(
-                            formatBytes(downloadController.totalCacheSizeBytes.value),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
-                          )),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textSecondary,
-                        side: const BorderSide(color: AppTheme.textMuted),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      icon: const Icon(Icons.delete_sweep_rounded, size: 20),
-                      label: const Text("Clear Cache Storage"),
-                      onPressed: () async {
-                        await downloadController.clearAllCache();
-                        Get.snackbar("Cache Cleared", "Temporary streaming cache successfully wiped",
-                            backgroundColor: AppTheme.surface, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Section 4: About
-            _buildSectionHeader("About Kukku"),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorder),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Kukku Music v1.0.0", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                  SizedBox(height: 4),
-                  Text(
-                    "High-performance YouTube Music streaming engine with background playback, lock caching, and direct audio stream extraction.",
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 120),
+            SizedBox(height: 20),
+            _SectionHeader("Audio Streaming"),
+            _StreamingQualityCard(),
+            SizedBox(height: 24),
+            _SectionHeader("Downloads & Offline"),
+            _DownloadsCard(),
+            SizedBox(height: 24),
+            _SectionHeader("Storage & Cache"),
+            _StorageCard(),
+            SizedBox(height: 24),
+            _SectionHeader("About Kukku"),
+            _AboutCard(),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildSectionHeader(String title) {
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader(this.title);
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
@@ -201,6 +64,272 @@ class SettingsScreen extends StatelessWidget {
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
         ),
+      ),
+    );
+  }
+}
+
+/// Card shell shared by every settings group.
+class _SettingsCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  const _SettingsCard({required this.child, this.padding});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _StreamingQualityCard extends StatelessWidget {
+  const _StreamingQualityCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = Get.find<SettingsController>();
+
+    return Obx(() => _SettingsCard(
+          // `RadioGroup` replaces the per-tile `groupValue`/`onChanged` pair,
+          // which Flutter deprecated after 3.32.
+          child: RadioGroup<int>(
+            groupValue: settings.streamingQuality.value,
+            onChanged: (value) => settings.setStreamingQuality(value ?? 1),
+            child: const Column(
+              children: [
+                RadioListTile<int>(
+                  value: 1,
+                  activeColor: AppTheme.primary,
+                  title: Text(
+                    "High quality (128–160 kbps)",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    "Best clarity. Uses more mobile data.",
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
+                ),
+                Divider(height: 1),
+                RadioListTile<int>(
+                  value: 0,
+                  activeColor: AppTheme.primary,
+                  title: Text(
+                    "Data saver (48–50 kbps)",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    "Lowest data usage. Noticeably lower fidelity.",
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
+  }
+}
+
+class _DownloadsCard extends StatelessWidget {
+  const _DownloadsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = Get.find<SettingsController>();
+
+    return Obx(() => _SettingsCard(
+          child: Column(
+            children: [
+              ListTile(
+                title: const Text("Download format",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  settings.downloadFormat.value == "opus"
+                      ? "Opus (.opus) — smaller files, best quality"
+                      : "M4A (.m4a) — widest compatibility",
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                ),
+                trailing: DropdownButton<String>(
+                  value: settings.downloadFormat.value,
+                  dropdownColor: AppTheme.surfaceLight,
+                  underline: const SizedBox.shrink(),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  items: const [
+                    DropdownMenuItem(value: "opus", child: Text("Opus")),
+                    DropdownMenuItem(value: "m4a", child: Text("M4A")),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) settings.setDownloadFormat(val);
+                  },
+                ),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: settings.cacheSongs.value,
+                // `activeColor` is deprecated on Switch tiles.
+                activeThumbColor: AppTheme.background,
+                activeTrackColor: AppTheme.primary,
+                title: const Text("Auto-cache streamed tracks",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text(
+                  "Saves tracks to this device while they play, so you can replay them offline.",
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                ),
+                onChanged: settings.toggleCacheSongs,
+              ),
+            ],
+          ),
+        ));
+  }
+}
+
+class _StorageCard extends StatelessWidget {
+  const _StorageCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final downloads = Get.find<DownloadViewController>();
+
+    return _SettingsCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Obx(() => _StorageRow(
+                label: "Streaming cache",
+                value: formatBytes(downloads.totalCacheSizeBytes.value),
+              )),
+          const SizedBox(height: 8),
+          Obx(() => _StorageRow(
+                label: "Downloads",
+                value: formatBytes(downloads.totalDownloadSizeBytes.value),
+              )),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.textSecondary,
+                side: const BorderSide(color: AppTheme.textMuted),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.delete_sweep_rounded, size: 20),
+              label: const Text("Clear streaming cache"),
+              // Destructive and irreversible, so confirm first — the old button
+              // wiped the cache on a single tap.
+              onPressed: () => _confirmClearCache(context, downloads),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmClearCache(
+    BuildContext context,
+    DownloadViewController downloads,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Clear streaming cache?"),
+        content: const Text(
+          "Cached tracks will be removed from this device and re-downloaded the next "
+          "time you play them. Your downloads are not affected.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text("Cancel", style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: AppTheme.background,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text("Clear"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    await downloads.clearAllCache();
+    Get.snackbar(
+      "Cache cleared",
+      "Temporary streaming cache has been removed",
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 2),
+    );
+  }
+}
+
+class _StorageRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StorageRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AboutCard extends StatelessWidget {
+  const _AboutCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SettingsCard(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Kukku Music v1.0.0",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            "Streaming music player with background playback, media-notification "
+            "controls, offline caching and direct audio stream extraction.",
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+          ),
+        ],
       ),
     );
   }

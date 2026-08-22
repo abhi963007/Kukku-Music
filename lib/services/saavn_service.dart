@@ -53,6 +53,26 @@ class SaavnService {
         .trim();
   }
 
+  /// First non-empty scalar in [candidates], or [fallback].
+  ///
+  /// Written as an explicit loop because `??` chains on `?.toString()` never
+  /// short-circuit on the empty string, and would happily stringify a nested
+  /// map (which is how "Release Year" used to render a whole JSON object).
+  static String _firstNonEmpty(List<dynamic> candidates, String fallback) {
+    for (final candidate in candidates) {
+      if (candidate == null || candidate is Map || candidate is List) continue;
+      final text = asText(candidate);
+      if (text.isNotEmpty) return text;
+    }
+    return fallback;
+  }
+
+  /// Track length in seconds, defaulting to 3:30 when the API omits it.
+  static int _durationSeconds(dynamic raw) {
+    final parsed = asInt(raw, 0);
+    return parsed > 0 ? parsed : 210;
+  }
+
   static String _cleanImage(String? url) {
     if (url == null || url.isEmpty) return '';
     return url.replaceAll('150x150', '500x500').replaceAll('50x50', '500x500');
@@ -82,32 +102,35 @@ class SaavnService {
       );
 
       final dynamic rawData = res.data is String ? jsonDecode(res.data) : res.data;
-      final results = rawData['results'] as List? ?? [];
+      final results = asStringMap(rawData)['results'] as List? ?? const [];
       final List<SongModel> songs = [];
 
       for (final item in results) {
-        if (item is! Map) continue;
-        final map = item as Map<String, dynamic>;
-        final moreInfo = map['more_info'] as Map<String, dynamic>? ?? {};
+        final map = asStringMap(item);
+        if (map.isEmpty) continue;
+        final moreInfo = asStringMap(map['more_info']);
 
-        final encryptedUrl = moreInfo['encrypted_media_url']?.toString();
+        final encryptedUrl = asText(moreInfo['encrypted_media_url']);
         final directAudioUrl = decryptMediaUrl(encryptedUrl);
 
-        final title = _cleanString(map['title']?.toString());
+        final title = _cleanString(asText(map['title']));
         final artist = _cleanString(
-          moreInfo['primary_artists']?.toString() ??
-              moreInfo['singers']?.toString() ??
-              map['subtitle']?.toString() ??
-              'Unknown Artist',
+          _firstNonEmpty([
+            moreInfo['primary_artists'],
+            moreInfo['singers'],
+            map['subtitle'],
+          ], 'Unknown Artist'),
         );
-        final album = _cleanString(moreInfo['album']?.toString() ?? map['album']?.toString() ?? 'Single');
-        final artUri = _cleanImage(map['image']?.toString());
-        final durationSec = int.tryParse(moreInfo['duration']?.toString() ?? '0') ?? 210;
+        final album = _cleanString(
+          _firstNonEmpty([moreInfo['album'], map['album']], 'Single'),
+        );
+        final artUri = _cleanImage(asText(map['image']));
+        final durationSec = _durationSeconds(moreInfo['duration']);
 
         if (title.isNotEmpty) {
           songs.add(
             SongModel(
-              id: map['id']?.toString() ?? title.hashCode.toString(),
+              id: asText(map['id']).isNotEmpty ? asText(map['id']) : title.hashCode.toString(),
               title: title,
               artist: artist,
               album: album,
@@ -155,28 +178,34 @@ class SaavnService {
       );
 
       final dynamic rawData = res.data is String ? jsonDecode(res.data) : res.data;
-      final results = rawData['results'] as List? ?? [];
+      final results = asStringMap(rawData)['results'] as List? ?? const [];
       final List<AlbumModel> albums = [];
 
       for (final item in results) {
-        if (item is! Map) continue;
-        final map = item as Map<String, dynamic>;
-        final title = _cleanString(map['title']?.toString());
+        final map = asStringMap(item);
+        if (map.isEmpty) continue;
+        final moreInfo = asStringMap(map['more_info']);
+
+        final title = _cleanString(asText(map['title']));
         final artist = _cleanString(
-          map['more_info']?['primary_artists']?.toString() ??
-              map['music']?.toString() ??
-              map['subtitle']?.toString() ??
-              'Soundtrack',
+          _firstNonEmpty([
+            moreInfo['primary_artists'],
+            map['music'],
+            map['subtitle'],
+          ], 'Soundtrack'),
         );
-        final artUri = _cleanImage(map['image']?.toString());
-        final year = map['year']?.toString() ?? map['more_info']?.toString() ?? '';
-        final language = map['language']?.toString() ?? '';
-        final songCount = int.tryParse(map['more_info']?['song_pids']?.toString().split(',').length.toString() ?? '0') ?? 0;
+        final artUri = _cleanImage(asText(map['image']));
+        // `more_info` is a map; the old fallback stringified the whole thing and
+        // rendered "{song_pids: ..., ...}" as the release year.
+        final year = _firstNonEmpty([map['year'], moreInfo['year']], '');
+        final language = asText(map['language']);
+        final pids = asText(moreInfo['song_pids']);
+        final songCount = pids.isEmpty ? 0 : pids.split(',').where((e) => e.trim().isNotEmpty).length;
 
         if (title.isNotEmpty) {
           albums.add(
             AlbumModel(
-              id: map['id']?.toString() ?? title.hashCode.toString(),
+              id: asText(map['id']).isNotEmpty ? asText(map['id']) : title.hashCode.toString(),
               title: title,
               artist: artist,
               artUri: artUri,
@@ -214,40 +243,45 @@ class SaavnService {
       );
 
       final dynamic rawData = res.data is String ? jsonDecode(res.data) : res.data;
-      if (rawData is! Map) return null;
-      final map = rawData as Map<String, dynamic>;
+      final map = asStringMap(rawData);
+      if (map.isEmpty) return null;
 
-      final title = _cleanString(map['title']?.toString());
-      final artist = _cleanString(map['primary_artists']?.toString() ?? map['header_desc']?.toString() ?? 'Soundtrack');
-      final artUri = _cleanImage(map['image']?.toString());
-      final year = map['year']?.toString() ?? '';
-      final language = map['language']?.toString() ?? '';
+      final title = _cleanString(asText(map['title']));
+      final artist = _cleanString(
+        _firstNonEmpty([map['primary_artists'], map['header_desc']], 'Soundtrack'),
+      );
+      final artUri = _cleanImage(asText(map['image']));
+      final year = asText(map['year']);
+      final language = asText(map['language']);
 
-      final rawList = map['list'] as List? ?? [];
+      final rawList = map['list'] as List? ?? const [];
       final List<SongModel> albumSongs = [];
 
       for (final item in rawList) {
-        if (item is! Map) continue;
-        final songMap = item as Map<String, dynamic>;
-        final moreInfo = songMap['more_info'] as Map<String, dynamic>? ?? {};
+        final songMap = asStringMap(item);
+        if (songMap.isEmpty) continue;
+        final moreInfo = asStringMap(songMap['more_info']);
 
-        final encryptedUrl = moreInfo['encrypted_media_url']?.toString();
+        final encryptedUrl = asText(moreInfo['encrypted_media_url']);
         final directAudioUrl = decryptMediaUrl(encryptedUrl);
 
-        final songTitle = _cleanString(songMap['title']?.toString());
+        final songTitle = _cleanString(asText(songMap['title']));
         final songArtist = _cleanString(
-          moreInfo['primary_artists']?.toString() ??
-              moreInfo['singers']?.toString() ??
-              songMap['subtitle']?.toString() ??
-              artist,
+          _firstNonEmpty([
+            moreInfo['primary_artists'],
+            moreInfo['singers'],
+            songMap['subtitle'],
+          ], artist),
         );
-        final songArt = _cleanImage(songMap['image']?.toString());
-        final durationSec = int.tryParse(moreInfo['duration']?.toString() ?? '0') ?? 210;
+        final songArt = _cleanImage(asText(songMap['image']));
+        final durationSec = _durationSeconds(moreInfo['duration']);
 
         if (songTitle.isNotEmpty) {
           albumSongs.add(
             SongModel(
-              id: songMap['id']?.toString() ?? songTitle.hashCode.toString(),
+              id: asText(songMap['id']).isNotEmpty
+                  ? asText(songMap['id'])
+                  : songTitle.hashCode.toString(),
               title: songTitle,
               artist: songArtist,
               album: title,
@@ -310,12 +344,14 @@ class SaavnService {
 
   /// Resolve direct 320kbps audio URL by song title & artist
   static Future<String?> resolveAudioUrl(String title, [String? artist]) async {
+    if (title.trim().isEmpty) return null;
     final query = (artist != null && artist.isNotEmpty && artist != 'Unknown')
         ? '$title $artist'
         : title;
     final results = await searchSongs(query, limit: 3);
-    if (results.isNotEmpty && results.first.extras['url'] != null && results.first.extras['url'].toString().isNotEmpty) {
-      return results.first.extras['url'].toString();
+    for (final result in results) {
+      final url = asText(result.extras['url']);
+      if (url.isNotEmpty) return url;
     }
     return null;
   }

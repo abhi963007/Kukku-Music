@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext stays permitted deliberately:
+   * just_audio's LockCachingAudioSource spins up a local HTTP proxy on
+     127.0.0.1 when request headers are set, which is plain HTTP.
+   * Some JioSaavn / Invidious mirrors still hand back http:// media URLs, and
+     blocking those would break playback rather than fail safely.
+  Everything the app initiates itself uses https.
+-->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
@@ -6,4 +14,8 @@
             <certificates src="user" />
         </trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
 </network-security-config>

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="splash_bg">#0B0D14</color>
+    <!-- Matches AppTheme.background so the native launch screen, the Flutter
+         splash and the app itself share one colour (there used to be a visible
+         flash from #0B0D14 to black). -->
+    <color name="splash_bg">#000000</color>
 </resources>
