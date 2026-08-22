@@ -7,7 +7,11 @@ import '../utils/helper.dart';
 import 'saavn_service.dart';
 
 class GroqAiService extends getx.GetxService {
-  static const String defaultApiKey = '';
+  // Supports build-time key injection via:
+  //   flutter build apk --dart-define=GROQ_API_KEY=your_key
+  //   flutter build apk --dart-define-from-file=keys.json
+  static const String defaultApiKey =
+      String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
   static const String defaultModel = 'openai/gpt-oss-120b';
 
   final Dio _dio = Dio(
@@ -25,6 +29,8 @@ class GroqAiService extends getx.GetxService {
     final custom = boxGet<String>('AppPrefs', 'groqApiKey', '');
     return custom.trim().isNotEmpty ? custom.trim() : defaultApiKey;
   }
+
+  bool get isConfigured => _apiKey.isNotEmpty;
 
   String get currentModel {
     final model = boxGet<String>('AppPrefs', 'groqModel', defaultModel);

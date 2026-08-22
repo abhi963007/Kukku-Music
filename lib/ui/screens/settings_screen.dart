@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/download_controller.dart';
 import '../../controllers/settings_controller.dart';
+import '../../services/groq_ai_service.dart';
 import '../../utils/helper.dart';
 import '../theme/app_theme.dart';
 
@@ -365,6 +366,8 @@ class _AiSettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentModel = boxGet<String>('AppPrefs', 'groqModel', 'openai/gpt-oss-120b');
+    final customApiKey = boxGet<String>('AppPrefs', 'groqApiKey', '');
+    final hasKey = customApiKey.isNotEmpty || GroqAiService.defaultApiKey.isNotEmpty;
 
     return _SettingsCard(
       padding: const EdgeInsets.all(16),
@@ -404,14 +407,20 @@ class _AiSettingsCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.success.withValues(alpha: 0.15),
+                  color: hasKey
+                      ? AppTheme.success.withValues(alpha: 0.15)
+                      : AppTheme.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: hasKey
+                        ? AppTheme.success.withValues(alpha: 0.3)
+                        : AppTheme.warning.withValues(alpha: 0.3),
+                  ),
                 ),
-                child: const Text(
-                  "ACTIVE",
+                child: Text(
+                  hasKey ? "ACTIVE" : "NO KEY",
                   style: TextStyle(
-                    color: AppTheme.success,
+                    color: hasKey ? AppTheme.success : AppTheme.warning,
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.8,
@@ -488,6 +497,122 @@ class _AiSettingsCard extends StatelessWidget {
               ),
             );
           }),
+          const SizedBox(height: 6),
+          InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            onTap: () => _showApiKeyDialog(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.key_rounded, color: AppTheme.primaryAccent, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Groq API Key",
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          customApiKey.isNotEmpty
+                              ? "Custom key set (${customApiKey.substring(0, customApiKey.length > 8 ? 8 : customApiKey.length)}...)"
+                              : (GroqAiService.defaultApiKey.isNotEmpty
+                                  ? "Built-in / environment key active"
+                                  : "Tap to set custom API key"),
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showApiKeyDialog(BuildContext context) {
+    final currentKey = boxGet<String>('AppPrefs', 'groqApiKey', '');
+    final controller = TextEditingController(text: currentKey);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          side: const BorderSide(color: AppTheme.cardBorder),
+        ),
+        title: const Text(
+          "Groq AI API Key",
+          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Enter your Groq Cloud API key (starts with gsk_). You can get a free key from console.groq.com.",
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: "gsk_...",
+                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.surfaceLight,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  borderSide: const BorderSide(color: AppTheme.cardBorder),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (currentKey.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                boxPut('AppPrefs', 'groqApiKey', '');
+                Navigator.of(ctx).pop();
+                (context as Element).markNeedsBuild();
+              },
+              child: const Text("Clear Key", style: TextStyle(color: AppTheme.error)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel", style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              boxPut('AppPrefs', 'groqApiKey', controller.text.trim());
+              Navigator.of(ctx).pop();
+              (context as Element).markNeedsBuild();
+            },
+            child: const Text("Save"),
+          ),
         ],
       ),
     );

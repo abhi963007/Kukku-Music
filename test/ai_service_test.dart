@@ -5,6 +5,7 @@ void main() {
   group('Smart Music Engine Service Tests', () {
     test('Default model configuration is valid', () {
       expect(GroqAiService.defaultModel, 'openai/gpt-oss-120b');
+      expect(GroqAiService.defaultApiKey, isA<String>());
     });
   });
 }
