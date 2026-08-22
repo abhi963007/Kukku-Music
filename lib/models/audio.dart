@@ -1,3 +1,5 @@
+import '../utils/helper.dart';
+
 enum Codec { mp4a, opus }
 
 class Audio {
@@ -30,7 +32,8 @@ class Audio {
       };
 
   factory Audio.fromJson(dynamic json) {
-    if (json == null) {
+    final map = asStringMap(json);
+    if (map.isEmpty) {
       return Audio(
         itag: 0,
         audioCodec: Codec.mp4a,
@@ -41,18 +44,18 @@ class Audio {
         size: 0,
       );
     }
-    
-    final codecStr = json["audioCodec"]?.toString() ?? "";
+
+    final codecStr = asText(map["audioCodec"]).toLowerCase();
     final codec = codecStr.contains("mp4a") || codecStr.contains("mp") ? Codec.mp4a : Codec.opus;
-    
+
     return Audio(
-      itag: json['itag'] ?? 0,
+      itag: asInt(map['itag']),
       audioCodec: codec,
-      duration: json["approxDurationMs"] ?? 0,
-      bitrate: json["bitrate"] ?? 0,
-      loudnessDb: (json['loudnessDb'] is num) ? (json['loudnessDb'] as num).toDouble() : 0.0,
-      url: json['url'] ?? '',
-      size: json["size"] ?? 0,
+      duration: asInt(map["approxDurationMs"]),
+      bitrate: asInt(map["bitrate"]),
+      loudnessDb: asDouble(map['loudnessDb']),
+      url: asText(map['url']),
+      size: asInt(map["size"]),
     );
   }
 }

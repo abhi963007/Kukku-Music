@@ -8,6 +8,7 @@ import '../../controllers/player_controller.dart';
 import '../../controllers/search_controller.dart';
 import '../../models/song_model.dart';
 import '../../services/music_service.dart';
+import '../../services/saavn_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/song_tile.dart';
 
@@ -235,29 +236,43 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
 
                 // ── SECTION 3: Movie Soundtracks & Albums ────────────────────
-                if (_homeData != null && _homeData!.movieHits.isNotEmpty) ...[
+                if (_homeData != null && (_homeData!.albums.isNotEmpty || _homeData!.movieHits.isNotEmpty)) ...[
                   _buildSectionHeader(
                     title: "Movie Soundtracks & Albums",
-                    subtitle: "Original film hits & albums",
-                    onPlayAll: () => _playerController.playQueue(_homeData!.movieHits, 0),
+                    subtitle: "Original film hits & complete albums",
+                    onPlayAll: () {
+                      if (_homeData!.movieHits.isNotEmpty) {
+                        _playerController.playQueue(_homeData!.movieHits, 0);
+                      }
+                    },
                   ),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 215,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _homeData!.movieHits.length,
-                        itemBuilder: (context, index) {
-                          final song = _homeData!.movieHits[index];
-                          return _buildSquareMovieCard(song, _homeData!.movieHits, index);
-                        },
-                      ),
+                      height: 220,
+                      child: _homeData!.albums.isNotEmpty
+                          ? ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: _homeData!.albums.length,
+                              itemBuilder: (context, index) {
+                                final album = _homeData!.albums[index];
+                                return _buildAlbumCard(album);
+                              },
+                            )
+                          : ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: _homeData!.movieHits.length,
+                              itemBuilder: (context, index) {
+                                final song = _homeData!.movieHits[index];
+                                return _buildSquareMovieCard(song, _homeData!.movieHits, index);
+                              },
+                            ),
                     ),
                   ),
                 ],
 
-                // ── SECTION 4: Top Melodies & Picks (List View) ──────────────
+                // ── SECTION 4: Top Melodies & Picks (List View - Unlimited) ──
                 if (_homeData != null && _homeData!.topPicks.isNotEmpty) ...[
                   _buildSectionHeader(
                     title: "Essential Melodies & Hits",
@@ -273,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () => _playerController.playQueue(_homeData!.topPicks, index),
                         );
                       },
-                      childCount: _homeData!.topPicks.take(8).length,
+                      childCount: _homeData!.topPicks.length,
                     ),
                   ),
                 ],
@@ -585,6 +600,224 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAlbumCard(AlbumModel album) {
+    return GestureDetector(
+      onTap: () => _openAlbumDetails(album),
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 140,
+                    height: 140,
+                    child: album.artUri.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: album.artUri,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: AppTheme.surfaceLight),
+                            errorWidget: (context, url, error) => Container(color: AppTheme.surfaceLight),
+                          )
+                        : Container(color: AppTheme.surfaceLight),
+                  ),
+                ),
+                Positioned(
+                  bottom: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.album_rounded, color: AppTheme.primaryAccent, size: 12),
+                        SizedBox(width: 3),
+                        Text(
+                          "Album",
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              album.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              album.artist.isNotEmpty ? album.artist : (album.year.isNotEmpty ? "Year: ${album.year}" : "Soundtrack"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 11.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openAlbumDetails(AlbumModel album) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return FutureBuilder<AlbumModel?>(
+          future: SaavnService.getAlbumDetails(album.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                height: 350,
+                alignment: Alignment.center,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: AppTheme.primaryAccent),
+                    SizedBox(height: 16),
+                    Text("Loading Album Tracks...", style: TextStyle(color: Colors.white, fontSize: 14)),
+                  ],
+                ),
+              );
+            }
+
+            final albumData = snapshot.data ?? album;
+            final songs = albumData.songs;
+
+            return Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: albumData.artUri.isNotEmpty
+                              ? CachedNetworkImage(imageUrl: albumData.artUri, fit: BoxFit.cover)
+                              : Container(color: AppTheme.surfaceLight),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              albumData.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              albumData.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            ),
+                            if (albumData.year.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                "Release Year: ${albumData.year}",
+                                style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (songs.isNotEmpty)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _playerController.playQueue(songs, 0);
+                        },
+                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 24),
+                        label: Text(
+                          "Play All (${songs.length} Tracks)",
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  const Divider(color: AppTheme.cardBorder),
+                  Expanded(
+                    child: songs.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "No tracks found in this album",
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: songs.length,
+                            itemBuilder: (context, index) {
+                              final s = songs[index];
+                              return SongTile(
+                                song: s,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _playerController.playQueue(songs, index);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

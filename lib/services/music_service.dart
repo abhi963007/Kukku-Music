@@ -382,26 +382,29 @@ class MusicServices extends getx.GetxService {
     try {
       final queries = _getQueriesForLanguage(language);
 
-      // Fetch all three sections concurrently
+      // Fetch trending, albums, movie hits, and melodies concurrently from JioSaavn API
       final results = await Future.wait([
-        searchTracks(queries.trendingQuery),
-        searchTracks(queries.movieHitsQuery),
-        searchTracks(queries.melodiesQuery),
+        SaavnService.searchSongs(queries.trendingQuery, limit: 30),
+        SaavnService.searchAlbums("${language == 'Trending' ? 'Latest' : language} Movie Soundtracks", limit: 20),
+        SaavnService.searchSongs(queries.movieHitsQuery, limit: 30),
+        SaavnService.searchSongs(queries.melodiesQuery, limit: 40),
       ]);
 
-      final trending = results[0];
-      final movieHits = results[1];
-      final melodies = results[2];
+      final trending = results[0] as List<SongModel>;
+      final albums = results[1] as List<AlbumModel>;
+      final movieHits = results[2] as List<SongModel>;
+      final melodies = results[3] as List<SongModel>;
 
       final data = LanguageHomeData(
         language: language,
-        trending: trending,
-        movieHits: movieHits,
-        topPicks: melodies.isNotEmpty ? melodies : trending,
+        trending: trending.isNotEmpty ? trending : await searchTracks(queries.trendingQuery),
+        albums: albums,
+        movieHits: movieHits.isNotEmpty ? movieHits : await searchTracks(queries.movieHitsQuery),
+        topPicks: melodies.isNotEmpty ? melodies : (trending.isNotEmpty ? trending : []),
         artists: queries.popularArtists,
       );
 
-      if (trending.isNotEmpty || movieHits.isNotEmpty || melodies.isNotEmpty) {
+      if (trending.isNotEmpty || movieHits.isNotEmpty || albums.isNotEmpty) {
         _languageCache[language] = data;
       }
       return data;
@@ -410,6 +413,7 @@ class MusicServices extends getx.GetxService {
       return LanguageHomeData(
         language: language,
         trending: [],
+        albums: [],
         movieHits: [],
         topPicks: [],
         artists: _getQueriesForLanguage(language).popularArtists,
@@ -489,6 +493,7 @@ class MusicServices extends getx.GetxService {
 class LanguageHomeData {
   final String language;
   final List<SongModel> trending;
+  final List<AlbumModel> albums;
   final List<SongModel> movieHits;
   final List<SongModel> topPicks;
   final List<String> artists;
@@ -496,6 +501,7 @@ class LanguageHomeData {
   LanguageHomeData({
     required this.language,
     required this.trending,
+    this.albums = const [],
     required this.movieHits,
     required this.topPicks,
     required this.artists,

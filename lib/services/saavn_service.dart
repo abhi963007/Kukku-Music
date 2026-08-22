@@ -347,7 +347,4 @@ class SaavnService {
         return 'Trending Hindi English Hits';
     }
   }
-        return 'Trending Hindi English Hits';
-    }
-  }
 }

@@ -1,3 +1,4 @@
+import '../utils/helper.dart';
 import 'audio.dart';
 
 class HMStreamingData {
@@ -36,18 +37,17 @@ class HMStreamingData {
       };
 
   factory HMStreamingData.fromJson(dynamic json) {
-    if (json == null) {
+    final map = asStringMap(json);
+    if (map.isEmpty) {
       return HMStreamingData(playable: false, statusMSG: "Empty data");
     }
     return HMStreamingData(
-      playable: json['playable'] ?? false,
-      statusMSG: json['statusMSG'] ?? '',
-      lowQualityAudio: json['lowQualityAudio'] != null
-          ? Audio.fromJson(json['lowQualityAudio'])
-          : null,
-      highQualityAudio: json['highQualityAudio'] != null
-          ? Audio.fromJson(json['highQualityAudio'])
-          : null,
+      playable: asBool(map['playable']),
+      statusMSG: asText(map['statusMSG']),
+      lowQualityAudio:
+          map['lowQualityAudio'] != null ? Audio.fromJson(map['lowQualityAudio']) : null,
+      highQualityAudio:
+          map['highQualityAudio'] != null ? Audio.fromJson(map['highQualityAudio']) : null,
     );
   }
 }

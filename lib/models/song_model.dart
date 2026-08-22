@@ -1,5 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 
+import '../utils/helper.dart';
+
 class SongModel {
   final String id;
   final String title;
@@ -56,7 +58,8 @@ class SongModel {
   }
 
   factory SongModel.fromJson(dynamic json) {
-    if (json == null) {
+    final map = asStringMap(json);
+    if (map.isEmpty) {
       return SongModel(
         id: '',
         title: 'Unknown Title',
@@ -67,13 +70,13 @@ class SongModel {
       );
     }
     return SongModel(
-      id: json['id'] ?? '',
-      title: json['title'] ?? 'Unknown Title',
-      artist: json['artist'] ?? 'Unknown Artist',
-      album: json['album'] ?? 'Unknown Album',
-      artUri: json['artUri'] ?? '',
-      duration: Duration(milliseconds: json['durationMs'] ?? 0),
-      extras: json['extras'] != null ? Map<String, dynamic>.from(json['extras']) : {},
+      id: asText(map['id']),
+      title: asText(map['title']).isNotEmpty ? asText(map['title']) : 'Unknown Title',
+      artist: asText(map['artist']).isNotEmpty ? asText(map['artist']) : 'Unknown Artist',
+      album: asText(map['album']).isNotEmpty ? asText(map['album']) : 'Unknown Album',
+      artUri: asText(map['artUri']),
+      duration: Duration(milliseconds: asInt(map['durationMs'])),
+      extras: asStringMap(map['extras']),
     );
   }
 }
@@ -92,14 +95,16 @@ class MediaItemBuilder {
   }
 
   static MediaItem fromJson(dynamic json) {
+    final map = asStringMap(json);
+    final artUri = asText(map['artUri']);
     return MediaItem(
-      id: json['id'] ?? '',
-      title: json['title'] ?? 'Unknown Title',
-      artist: json['artist'] ?? 'Unknown Artist',
-      album: json['album'] ?? 'Unknown Album',
-      artUri: json['artUri'] != null ? Uri.tryParse(json['artUri']) : null,
-      duration: Duration(milliseconds: json['duration'] ?? 0),
-      extras: json['extras'] != null ? Map<String, dynamic>.from(json['extras']) : {},
+      id: asText(map['id']),
+      title: asText(map['title']).isNotEmpty ? asText(map['title']) : 'Unknown Title',
+      artist: asText(map['artist']).isNotEmpty ? asText(map['artist']) : 'Unknown Artist',
+      album: asText(map['album']).isNotEmpty ? asText(map['album']) : 'Unknown Album',
+      artUri: artUri.isNotEmpty ? Uri.tryParse(artUri) : null,
+      duration: Duration(milliseconds: asInt(map['duration'])),
+      extras: asStringMap(map['extras']),
     );
   }
 }
@@ -139,18 +144,19 @@ class AlbumModel {
   }
 
   factory AlbumModel.fromJson(dynamic json) {
-    if (json == null) {
+    final map = asStringMap(json);
+    if (map.isEmpty) {
       return AlbumModel(id: '', title: '', artist: '', artUri: '');
     }
-    final rawSongs = json['songs'] as List? ?? [];
+    final rawSongs = map['songs'] as List? ?? const [];
     return AlbumModel(
-      id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
-      artist: json['artist']?.toString() ?? '',
-      artUri: json['artUri']?.toString() ?? '',
-      year: json['year']?.toString() ?? '',
-      language: json['language']?.toString() ?? '',
-      songCount: int.tryParse(json['songCount']?.toString() ?? '0') ?? 0,
+      id: asText(map['id']),
+      title: asText(map['title']),
+      artist: asText(map['artist']),
+      artUri: asText(map['artUri']),
+      year: asText(map['year']),
+      language: asText(map['language']),
+      songCount: asInt(map['songCount']),
       songs: rawSongs.map((e) => SongModel.fromJson(e)).toList(),
     );
   }
