@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../models/song_model.dart';
@@ -137,12 +138,34 @@ class DownloadViewController extends GetxController {
     cachedSongs.value = cachedList;
   }
 
+  /// Downloads [song] and reports the outcome to the user.
+  ///
+  /// Feedback lives here rather than at each call site so every entry point
+  /// (track menu, player screen) gives identical, specific messaging — the
+  /// player screen used to fail completely silently.
   Future<bool> download(SongModel song) async {
-    final success = await downloader.downloadSong(song);
-    if (success) {
+    final result = await downloader.downloadSong(song);
+
+    // A second tap while a download is running is not an error; stay quiet.
+    if (result.alreadyRunning) return false;
+
+    if (result.success) {
       await loadOfflineData();
+      _notify('Downloaded', result.message);
+    } else {
+      _notify('Download failed', result.message);
     }
-    return success;
+    return result.success;
+  }
+
+  void _notify(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 3),
+    );
   }
 
   Future<void> removeDownload(String songId) async {

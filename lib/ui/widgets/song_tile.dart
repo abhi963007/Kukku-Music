@@ -204,17 +204,9 @@ class _SongMenu extends StatelessWidget {
               duration: const Duration(seconds: 2),
             );
           case 'download':
-            final ok = await downloadController.download(song);
-            // The download used to fail silently; surface the outcome.
-            Get.snackbar(
-              ok ? 'Downloaded' : 'Download failed',
-              ok
-                  ? "'${song.title}' is available offline"
-                  : "Couldn't download '${song.title}'. Try again later.",
-              snackPosition: SnackPosition.BOTTOM,
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 3),
-            );
+            // DownloadViewController.download reports success/failure itself, so
+            // no snackbar here — two would stack.
+            await downloadController.download(song);
           case 'delete':
             await downloadController.removeDownload(song.id);
           case 'remove_recent':
