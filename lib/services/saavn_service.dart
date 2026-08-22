@@ -325,13 +325,13 @@ class SaavnService {
 
     final queries = <String>[];
     if (cleanArtist.isNotEmpty) {
-      queries.add('$cleanArtist top hits');
-      queries.add('$cleanArtist latest songs');
+      queries.add('$cleanArtist latest hits');
+      queries.add('$cleanArtist trending');
     }
     if (album.isNotEmpty && album != 'Single' && album != 'Search') {
-      queries.add(album);
+      queries.add('$album songs');
     }
-    queries.add('$title similar songs');
+    queries.add('$title trending similar');
 
     for (final q in queries) {
       final results = await searchSongs(q, limit: 15);

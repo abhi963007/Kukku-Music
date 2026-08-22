@@ -162,7 +162,7 @@ class _SearchBody extends StatelessWidget {
               itemBuilder: (context, index) => SongTile(
                 song: controller.searchResults[index],
                 onTap: () =>
-                    playerController.playQueue(controller.searchResults, index),
+                    playerController.playSong(controller.searchResults[index]),
               ),
             );
           }

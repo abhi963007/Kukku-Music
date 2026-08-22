@@ -29,6 +29,9 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 20),
+            _SectionHeader("Groq AI Engine"),
+            _AiSettingsCard(),
+            SizedBox(height: 24),
             _SectionHeader("Audio Streaming"),
             _StreamingQualityCard(),
             SizedBox(height: 24),
@@ -204,29 +207,31 @@ class _StorageCard extends StatelessWidget {
     return _SettingsCard(
       padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Obx(() => _StorageRow(
                 label: "Streaming cache",
                 value: formatBytes(downloads.totalCacheSizeBytes.value),
               )),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Obx(() => _StorageRow(
-                label: "Downloads",
+                label: "Offline Downloads",
                 value: formatBytes(downloads.totalDownloadSizeBytes.value),
               )),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.textSecondary,
-                side: const BorderSide(color: AppTheme.textMuted),
+                side: const BorderSide(color: AppTheme.cardBorder),
                 padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
               ),
               icon: const Icon(Icons.delete_sweep_rounded, size: 20),
               label: const Text("Clear streaming cache"),
-              // Destructive and irreversible, so confirm first — the old button
-              // wiped the cache on a single tap.
               onPressed: () => _confirmClearCache(context, downloads),
             ),
           ),
@@ -242,10 +247,11 @@ class _StorageCard extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Clear streaming cache?"),
+        backgroundColor: AppTheme.surface,
+        title: const Text("Clear Cache?", style: TextStyle(color: AppTheme.textPrimary)),
         content: const Text(
-          "Cached tracks will be removed from this device and re-downloaded the next "
-          "time you play them. Your downloads are not affected.",
+          "This will remove temporarily cached songs. Downloaded offline songs will not be deleted.",
+          style: TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -325,10 +331,163 @@ class _AboutCard extends StatelessWidget {
           ),
           SizedBox(height: 4),
           Text(
-            "Streaming music player with background playback, media-notification "
-            "controls, offline caching and direct audio stream extraction.",
+            "Streaming music player with intelligent discovery, background playback, "
+            "media-notification controls, offline caching and direct audio stream extraction.",
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiSettingsCard extends StatelessWidget {
+  const _AiSettingsCard();
+
+  static const List<Map<String, String>> _models = [
+    {
+      'id': 'openai/gpt-oss-120b',
+      'name': 'High Intelligence Engine',
+      'desc': 'Deep musical knowledge & contextual track metadata',
+    },
+    {
+      'id': 'qwen/qwen3.6-27b',
+      'name': 'Multilingual Specialist',
+      'desc': 'Optimized for regional languages and Indian soundtracks',
+    },
+    {
+      'id': 'openai/gpt-oss-20b',
+      'name': 'Ultra-Fast Engine',
+      'desc': 'Sub-second real-time radio and seamless queue continuation',
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final currentModel = boxGet<String>('AppPrefs', 'groqModel', 'openai/gpt-oss-120b');
+
+    return _SettingsCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: const Icon(Icons.bolt_rounded, color: Colors.black, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Smart Discovery Engine",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      "Real-time track credits & seamless radio flow",
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                ),
+                child: const Text(
+                  "ACTIVE",
+                  style: TextStyle(
+                    color: AppTheme.success,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Discovery Model",
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(_models.length, (index) {
+            final m = _models[index];
+            final isSelected = m['id'] == currentModel;
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              onTap: () {
+                boxPut('AppPrefs', 'groqModel', m['id']!);
+                (context as Element).markNeedsBuild();
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.primary.withValues(alpha: 0.12)
+                      : AppTheme.surfaceLight.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  border: Border.all(
+                    color: isSelected ? AppTheme.primary : AppTheme.cardBorder,
+                    width: isSelected ? 1.2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                      color: isSelected ? AppTheme.primaryAccent : AppTheme.textMuted,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            m['name']!,
+                            style: TextStyle(
+                              color: isSelected ? AppTheme.primaryAccent : AppTheme.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            m['desc']!,
+                            style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );

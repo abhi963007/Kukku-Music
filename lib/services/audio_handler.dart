@@ -14,6 +14,7 @@ import '../models/audio.dart';
 import '../models/song_model.dart';
 import '../models/streaming_data.dart';
 import '../utils/helper.dart';
+import 'groq_ai_service.dart';
 import 'music_service.dart';
 import 'saavn_service.dart';
 import 'storage_paths.dart';
@@ -679,11 +680,15 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       currentSongUrl = null;
       isSongLoading = false;
       _isTransitioning = false;
-      playbackState.add(playbackState.value.copyWith(
-        processingState: AudioProcessingState.error,
-        errorMessage: 'Unable to resolve audio stream for "${currentSong.title}"',
-      ));
-      printERROR('Cannot play: Unable to resolve audio stream');
+      printERROR('Cannot play: Unable to resolve audio stream for "${currentSong.title}"');
+      if (queue.value.length > 1 && index < queue.value.length - 1) {
+        skipToNext();
+      } else {
+        playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          errorMessage: 'Unable to resolve audio stream for "${currentSong.title}"',
+        ));
+      }
       return;
     }
 
@@ -728,10 +733,14 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       printERROR('Failed to start player for ${currentSong.id}', e);
       isSongLoading = false;
       _isTransitioning = false;
-      playbackState.add(playbackState.value.copyWith(
-        processingState: AudioProcessingState.error,
-        errorMessage: 'Could not play "${currentSong.title}"',
-      ));
+      if (queue.value.length > 1 && index < queue.value.length - 1) {
+        skipToNext();
+      } else {
+        playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          errorMessage: 'Could not play "${currentSong.title}"',
+        ));
+      }
     }
   }
 
@@ -748,13 +757,31 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       final seedArtist = currentItem?.artist ?? '';
       final seedAlbum = currentItem?.album ?? '';
 
-      printINFO('Auto-replenishing radio queue for: $seedTitle - $seedArtist');
-
+      final currentQueue = List<MediaItem>.from(queue.value);
+      final excludeTitles = currentQueue.map((e) => e.title).toList();
       List<SongModel> recommendedSongs = [];
-      if (seedTitle.isNotEmpty) {
+
+      // 1. Groq AI context-aware radio recommendations (fresh trending priority)
+      if (getx.Get.isRegistered<GroqAiService>() && seedTitle.isNotEmpty) {
+        try {
+          final aiService = getx.Get.find<GroqAiService>();
+          recommendedSongs = await aiService.getSmartRadioRecommendations(
+            currentTitle: seedTitle,
+            currentArtist: seedArtist,
+            currentAlbum: seedAlbum,
+            excludeTitles: excludeTitles,
+          );
+        } catch (e) {
+          printERROR('Groq AI radio replenishment failed', e);
+        }
+      }
+
+      // 2. Saavn related tracks fallback
+      if (recommendedSongs.isEmpty && seedTitle.isNotEmpty) {
         recommendedSongs = await SaavnService.getRelatedSongs(seedTitle, seedArtist, seedAlbum);
       }
 
+      // 3. MusicServices radio fallback
       if (recommendedSongs.isEmpty && seedSongId.isNotEmpty) {
         final MusicServices musicService = getx.Get.isRegistered<MusicServices>()
             ? getx.Get.find<MusicServices>()

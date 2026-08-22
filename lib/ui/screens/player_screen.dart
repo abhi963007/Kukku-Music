@@ -11,6 +11,7 @@ import '../widgets/mini_player.dart';
 import '../widgets/palette_background.dart';
 import '../widgets/progress_slider.dart';
 import '../widgets/scrolling_text.dart';
+import '../widgets/song_details_sheet.dart';
 import '../widgets/state_placeholder.dart';
 import 'player_layout.dart';
 
@@ -464,8 +465,10 @@ class _BottomActions extends StatelessWidget {
       final isDownloaded = downloads.downloader.isDownloaded(song.id);
       final progress = downloads.downloader.getProgress(song.id);
 
+      Widget downloadWidget;
+
       if (isDownloading) {
-        return _pill(
+        downloadWidget = _pill(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -484,10 +487,8 @@ class _BottomActions extends StatelessWidget {
             ],
           ),
         );
-      }
-
-      if (isDownloaded) {
-        return _pill(
+      } else if (isDownloaded) {
+        downloadWidget = _pill(
           borderColor: AppTheme.success.withValues(alpha: 0.3),
           background: AppTheme.success.withValues(alpha: 0.12),
           child: const Row(
@@ -495,42 +496,68 @@ class _BottomActions extends StatelessWidget {
             children: [
               Icon(Icons.download_done_rounded, color: AppTheme.success, size: 16),
               SizedBox(width: 6),
-              Text('Available offline',
+              Text('Offline',
                   style: TextStyle(
                       color: AppTheme.success, fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
         );
-      }
-
-      return Center(
-        child: TextButton.icon(
+      } else {
+        downloadWidget = TextButton.icon(
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.textSecondary,
             backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.6),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusLg)),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           ),
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('Download offline', style: TextStyle(fontSize: 12)),
+          icon: const Icon(Icons.download_rounded, size: 16),
+          label: const Text('Download', style: TextStyle(fontSize: 12)),
           onPressed: () => downloads.download(song),
-        ),
+        );
+      }
+
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          downloadWidget,
+          const SizedBox(width: 10),
+          InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            onTap: () => SongDetailsSheet.show(context, song),
+            child: _pill(
+              background: AppTheme.surfaceLight.withValues(alpha: 0.6),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Details',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     });
   }
 
   Widget _pill({required Widget child, Color? background, Color? borderColor}) {
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(minHeight: AppTheme.minTouchTarget - 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: background ?? AppTheme.surfaceLight,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          border: borderColor != null ? Border.all(color: borderColor) : null,
-        ),
-        child: Center(child: child),
+    return Container(
+      constraints: const BoxConstraints(minHeight: AppTheme.minTouchTarget - 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: background ?? AppTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: borderColor != null ? Border.all(color: borderColor) : null,
       ),
+      child: Center(child: child),
     );
   }
 }

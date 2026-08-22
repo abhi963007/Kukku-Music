@@ -13,6 +13,7 @@ import 'controllers/search_controller.dart';
 import 'controllers/settings_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/downloader.dart';
+import 'services/groq_ai_service.dart';
 import 'services/music_service.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme/app_theme.dart';
@@ -60,6 +61,7 @@ void main() {
     Get.put<MyAudioHandler>(myAudioHandler, permanent: true);
     Get.put<MusicServices>(MusicServices(), permanent: true);
     Get.put<DownloaderService>(DownloaderService(), permanent: true);
+    Get.put<GroqAiService>(GroqAiService(), permanent: true);
     Get.put<PlayerController>(
       PlayerController(audioHandler: myAudioHandler),
       permanent: true,

@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 
 import '../models/song_model.dart';
 import '../services/audio_handler.dart';
+import '../services/groq_ai_service.dart';
 import '../utils/helper.dart';
 
 class PlayerController extends GetxController {
@@ -22,6 +23,11 @@ class PlayerController extends GetxController {
   final Rx<AudioServiceRepeatMode> repeatMode = AudioServiceRepeatMode.none.obs;
   final RxBool isShuffle = false.obs;
   final RxString audioBadge = "Auto".obs;
+
+  /// Reactive state for authentic song details, credits, mood and story
+  final RxMap<String, dynamic> currentSongDetails = <String, dynamic>{}.obs;
+  final RxBool isLoadingDetails = false.obs;
+  final Map<String, Map<String, dynamic>> _detailsCache = {};
 
   /// Index of the currently playing item within [queue]. Needed so the queue
   /// sheet highlights the right row when a song appears more than once.
@@ -68,11 +74,10 @@ class PlayerController extends GetxController {
 
       audioBadge.value = _badgeFor(item);
 
-      // Recents are persisted by the audio handler; only re-read when the track
-      // actually changed. Previously this ran on every duration tick, doing a
-      // synchronous Hive read and rebuilding the whole "Recently Played" list.
+      // Recents and song details are updated on track change
       if (previousId != item.id) {
         loadRecentSongs();
+        fetchDetailsForSong(currentSong.value!);
       }
     }, onError: (Object e) => printERROR('mediaItem stream error', e)));
 
@@ -246,6 +251,36 @@ class PlayerController extends GetxController {
       recentSongs.removeWhere((e) => e.id == songId);
     } catch (e) {
       printERROR('Failed to remove recent song $songId', e);
+    }
+  }
+
+  /// Automatically fetches authentic song details and credits in the background
+  Future<void> fetchDetailsForSong(SongModel song) async {
+    if (song.title.isEmpty) return;
+
+    if (_detailsCache.containsKey(song.id)) {
+      currentSongDetails.value = _detailsCache[song.id]!;
+      return;
+    }
+
+    if (Get.isRegistered<GroqAiService>()) {
+      isLoadingDetails.value = true;
+      try {
+        final aiService = Get.find<GroqAiService>();
+        final details = await aiService.getSongDetails(
+          title: song.title,
+          artist: song.artist,
+          album: song.album,
+        );
+        _detailsCache[song.id] = details;
+        if (currentSong.value?.id == song.id) {
+          currentSongDetails.value = details;
+        }
+      } catch (e) {
+        printERROR('Failed to fetch song details', e);
+      } finally {
+        isLoadingDetails.value = false;
+      }
     }
   }
 }
