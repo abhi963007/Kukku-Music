@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/player_controller.dart';
 import '../../controllers/search_controller.dart';
+import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../../services/music_service.dart';
 import '../data/artist_images.dart';
@@ -45,6 +46,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadLanguageContent(_selectedLanguage);
   }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning ☀️';
+    if (hour < 17) return 'Good Afternoon ⚡';
+    if (hour < 21) return 'Good Evening 🌙';
+    return 'Late Night Melodies ✨';
+  }
+
   Future<void> _loadLanguageContent(String language, {bool forceRefresh = false}) async {
     _playerController.loadRecentSongs();
     if (!mounted) return;
@@ -53,11 +63,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoading = true;
     });
 
+    final userData = Get.isRegistered<UserDataController>() ? Get.find<UserDataController>() : null;
+    final userSeeds = <SongModel>[
+      if (userData != null) ...userData.favorites,
+      if (userData != null) ...userData.history,
+    ];
+
     final data = await _musicServices.getLanguageHomeSections(
       language,
-      // Without this, pull-to-refresh returned the in-memory cache and looked
-      // like nothing happened.
       forceRefresh: forceRefresh,
+      userSeeds: userSeeds,
     );
     if (!mounted) return;
     setState(() {
@@ -135,37 +150,97 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _searchTrigger() {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        child: Semantics(
-          button: true,
-          label: 'Open search',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            onTap: () => widget.onNavigateTab(1),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: AppTheme.minTouchTarget),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                border: Border.all(color: AppTheme.cardBorder),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.search_rounded, color: AppTheme.textSecondary, size: 22),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "Search songs, artists, soundtracks…",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13.5),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getGreeting(),
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      "Personalized from your listening taste",
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _loadLanguageContent(_selectedLanguage, forceRefresh: true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.cardBorder),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 14, color: AppTheme.primary),
+                        SizedBox(width: 4),
+                        Text(
+                          "Refresh",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Semantics(
+              button: true,
+              label: 'Open search',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                onTap: () => widget.onNavigateTab(1),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: AppTheme.minTouchTarget),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border.all(color: AppTheme.cardBorder),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.search_rounded, color: AppTheme.textSecondary, size: 22),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Search songs, artists, soundtracks…",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -306,12 +381,38 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _contentSlivers() {
     final data = _homeData!;
     return [
+      if (data.dailyMix.isNotEmpty) ...[
+        _sectionHeader(
+          title: "✨ Made For You",
+          subtitle: "Daily Mix curated from your listening mood",
+          onPlayAll: () => _playerController.playQueue(data.dailyMix, 0),
+        ),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: _cardHeight(150, 13.5, 12),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              itemCount: data.dailyMix.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) => _SongCard(
+                song: data.dailyMix[index],
+                artSize: 150,
+                titleSize: 13.5,
+                subtitleSize: 12,
+                showPlayBadge: true,
+                onTap: () => _playerController.playQueue(data.dailyMix, index),
+              ),
+            ),
+          ),
+        ),
+      ],
       if (data.trending.isNotEmpty) ...[
         _sectionHeader(
           title: _selectedLanguage == "Trending"
-              ? "Trending Hits"
+              ? "🔥 Trending Hits"
               : "$_selectedLanguage Trending Hits",
-          subtitle: "Hottest tracks right now",
+          subtitle: "Hottest fresh tracks right now",
           onPlayAll: () => _playerController.playQueue(data.trending, 0),
         ),
         SliverToBoxAdapter(
