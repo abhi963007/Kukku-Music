@@ -8,7 +8,6 @@ import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_to_playlist_sheet.dart';
-import '../widgets/lyrics_sheet.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/palette_background.dart';
 import '../widgets/progress_slider.dart';
@@ -367,25 +366,16 @@ class _ActionPillsRow extends StatelessWidget {
 
           const SizedBox(width: 8),
 
-          // 2. Lyrics Pill
+          // 2. Credits / Info Pill
           _ActionPill(
-            icon: Icons.lyrics_outlined,
-            label: "Lyrics",
-            onTap: () => LyricsSheet.show(context, song),
-          ),
-
-          const SizedBox(width: 8),
-
-          // 3. Credits / Story Pill
-          _ActionPill(
-            icon: Icons.chat_bubble_outline_rounded,
+            icon: Icons.info_outline_rounded,
             label: "Credits",
             onTap: () => SongDetailsSheet.show(context, song),
           ),
 
           const SizedBox(width: 8),
 
-          // 4. Save to Playlist Pill
+          // 3. Save to Playlist Pill
           _ActionPill(
             icon: Icons.playlist_add_rounded,
             label: "Save",
