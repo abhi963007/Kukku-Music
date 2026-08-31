@@ -7,11 +7,12 @@ class SupabaseService {
   // flutter build apk --dart-define=SUPABASE_URL=https://xyz.supabase.co --dart-define=SUPABASE_ANON_KEY=your_key
   static const String defaultUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://placeholder-project.supabase.co',
+    defaultValue: 'https://ybltkhkzckkkxyyfuoig.supabase.co',
   );
   static const String defaultAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'placeholder-anon-key',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlibHRraGt6Y2tra3h5eWZ1b2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNjY4NjUsImV4cCI6MjEwMzc0Mjg2NX0._e_clHX1PYbIBz-0ZOXi3DwjNIMRmLIHsBWS2x5rOO8',
   );
 
   static SupabaseClient get client => Supabase.instance.client;
