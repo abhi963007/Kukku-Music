@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 
+import '../services/supabase_service.dart';
 import '../utils/helper.dart';
 
 class AiDiscoveryService {
@@ -38,7 +39,29 @@ class AiDiscoveryService {
       return cached;
     }
 
-    // Try AI generation for contextual real-time search terms
+    // 1. Try Supabase Edge Function first if configured
+    try {
+      final res = await SupabaseService.client.functions.invoke(
+        'ai-discovery',
+        body: {'language': language},
+      );
+      if (res.data != null) {
+        final List<dynamic> parsed = res.data is List
+            ? res.data as List<dynamic>
+            : (res.data['queries'] as List<dynamic>? ?? []);
+        final List<String> result =
+            parsed.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        if (result.isNotEmpty) {
+          _aiQueriesCache[key] = result;
+          _cacheStamp[key] = DateTime.now();
+          return result;
+        }
+      }
+    } catch (_) {
+      // Supabase Edge Function not deployed or returned error, fallback to Groq AI
+    }
+
+    // 2. Direct Groq AI generation for contextual real-time search terms
     try {
       final prompt =
           'You are a real-time streaming search optimizer for JioSaavn music catalog. '
