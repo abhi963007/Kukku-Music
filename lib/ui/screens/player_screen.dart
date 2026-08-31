@@ -171,6 +171,8 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final playerController = Get.find<PlayerController>();
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -181,42 +183,40 @@ class _TopBar extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
 
-        // Audio / Video Toggle Pill (YouTube Music style)
-        Container(
-          height: 34,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: Colors.black45,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: Row(
+        Expanded(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.headphones_rounded, size: 16, color: Colors.white),
-              ),
-              InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Get.rawSnackbar(
-                    message: "High Quality Audio Stream Active 🎵",
-                    duration: const Duration(seconds: 2),
-                    margin: const EdgeInsets.all(16),
-                    borderRadius: 12,
-                    backgroundColor: AppTheme.surface,
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  child: const Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white54),
+              Text(
+                song.album.isNotEmpty && song.album != 'Unknown Album'
+                    ? song.album.toUpperCase()
+                    : 'PLAYING FROM STREAM',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 2),
+              Obx(() => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      playerController.audioBadge.value,
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )),
             ],
           ),
         ),
