@@ -339,6 +339,12 @@ class UserDataController extends GetxController {
     }
   }
 
+  void clearHistory() {
+    history.clear();
+    boxPut('AppPrefs', 'recentSongs', []);
+    _showToast("Listening history cleared", Icons.clear_all_rounded);
+  }
+
   void _showToast(String message, IconData icon, {bool isFavorite = false}) {
     Get.rawSnackbar(
       messageText: Row(

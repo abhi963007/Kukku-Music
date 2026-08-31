@@ -6,6 +6,7 @@ import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/user_data_controller.dart';
 import '../../models/playlist_model.dart';
+import '../../models/song_model.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/helper.dart';
 import '../theme/app_theme.dart';
@@ -241,28 +242,28 @@ class _ProfileScreenState extends State<ProfileScreen>
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+                padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
                 child: Column(
                   children: [
                     // 1. VIP Profile Hero Card
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            const Color(0xFF242424),
-                            const Color(0xFF181818),
+                            Color(0xFF222222),
+                            Color(0xFF161616),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
+                            blurRadius: 14,
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
@@ -274,8 +275,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             child: Stack(
                               children: [
                                 Container(
-                                  width: 72,
-                                  height: 72,
+                                  width: 68,
+                                  height: 68,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: const LinearGradient(
@@ -286,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     boxShadow: [
                                       BoxShadow(
                                         color: AppTheme.primary.withValues(alpha: 0.35),
-                                        blurRadius: 14,
+                                        blurRadius: 12,
                                         offset: const Offset(0, 3),
                                       ),
                                     ],
@@ -311,18 +312,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   bottom: 0,
                                   right: 0,
                                   child: Container(
-                                    padding: const EdgeInsets.all(5),
+                                    padding: const EdgeInsets.all(4.5),
                                     decoration: const BoxDecoration(
                                       color: AppTheme.primary,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.camera_alt_rounded, size: 12, color: Colors.black),
+                                    child: const Icon(Icons.camera_alt_rounded, size: 11, color: Colors.black),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 15),
                           // Name, Email, Auth status
                           Expanded(
                             child: Column(
@@ -337,7 +338,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: AppTheme.textPrimary,
-                                          fontSize: 18,
+                                          fontSize: 17,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: -0.2,
                                         ),
@@ -346,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     const SizedBox(width: 6),
                                     GestureDetector(
                                       onTap: _editNameDialog,
-                                      child: const Icon(Icons.edit_rounded, size: 15, color: AppTheme.primary),
+                                      child: const Icon(Icons.edit_rounded, size: 14, color: AppTheme.primary),
                                     ),
                                   ],
                                 ),
@@ -357,13 +358,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppTheme.textSecondary,
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 // Cloud status pill
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: isAuth
                                         ? Colors.greenAccent.withValues(alpha: 0.12)
@@ -380,14 +381,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     children: [
                                       Icon(
                                         isAuth ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-                                        size: 12,
+                                        size: 11,
                                         color: isAuth ? Colors.greenAccent : AppTheme.textMuted,
                                       ),
-                                      const SizedBox(width: 5),
+                                      const SizedBox(width: 4),
                                       Text(
                                         isAuth ? "Supabase Cloud Synced" : "Guest Mode",
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: 10,
                                           fontWeight: FontWeight.w600,
                                           color: isAuth ? Colors.greenAccent : AppTheme.textMuted,
                                         ),
@@ -403,55 +404,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     const SizedBox(height: 14),
 
-                    // 2. Stats Row (4 Glass Cards)
+                    // 2. Interactive Segmented Selector Cards (NO duplicate pills!)
                     Obx(() {
                       return Row(
                         children: [
-                          _statPill("Favorites", _userData.favorites.length, Icons.favorite_rounded, Colors.redAccent, 0),
+                          _segmentedCard("Favorites", _userData.favorites.length, Icons.favorite_rounded, Colors.redAccent, 0),
                           const SizedBox(width: 8),
-                          _statPill("Playlists", _userData.playlists.length, Icons.queue_music_rounded, AppTheme.primary, 1),
+                          _segmentedCard("Playlists", _userData.playlists.length, Icons.queue_music_rounded, AppTheme.primary, 1),
                           const SizedBox(width: 8),
-                          _statPill("History", _userData.history.length, Icons.history_rounded, Colors.amberAccent, 2),
+                          _segmentedCard("History", _userData.history.length, Icons.history_rounded, Colors.amberAccent, 2),
                           const SizedBox(width: 8),
-                          _statPill("Downloads", _downloads.downloadedSongs.length, Icons.download_rounded, Colors.lightBlueAccent, 3),
+                          _segmentedCard("Downloads", _downloads.downloadedSongs.length, Icons.download_rounded, Colors.lightBlueAccent, 3),
                         ],
                       );
                     }),
-                    const SizedBox(height: 16),
-
-                    // 3. Scrollable Premium Pill Tab Bar
-                    SizedBox(
-                      height: 40,
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        padding: EdgeInsets.zero,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                        indicator: BoxDecoration(
-                          color: AppTheme.primary,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primary.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        labelColor: Colors.black,
-                        unselectedLabelColor: AppTheme.textSecondary,
-                        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                        unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
-                        dividerColor: Colors.transparent,
-                        tabs: const [
-                          Tab(text: "❤️ Favorites"),
-                          Tab(text: "📂 Playlists"),
-                          Tab(text: "🕒 History"),
-                          Tab(text: "📥 Downloads"),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -482,44 +448,70 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Center(
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : 'A',
-        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.primary),
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary),
       ),
     );
   }
 
-  Widget _statPill(String label, int count, IconData icon, Color color, int tabIndex) {
+  Widget _segmentedCard(String label, int count, IconData icon, Color color, int tabIndex) {
     final isSelected = _tabController.index == tabIndex;
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => _tabController.animateTo(tabIndex),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+        onTap: () {
+          _tabController.animateTo(tabIndex);
+          setState(() {});
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF2A2A2A) : const Color(0xFF1E1E1E),
-            borderRadius: BorderRadius.circular(14),
+            color: isSelected
+                ? AppTheme.primary.withValues(alpha: 0.15)
+                : const Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isSelected ? AppTheme.primary.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.06),
+              color: isSelected
+                  ? AppTheme.primary
+                  : Colors.white.withValues(alpha: 0.08),
+              width: isSelected ? 1.5 : 1.0,
             ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(height: 4),
+              Icon(
+                icon,
+                color: isSelected ? color : color.withValues(alpha: 0.7),
+                size: 20,
+              ),
+              const SizedBox(height: 5),
               Text(
                 count.toString(),
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textPrimary,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
             ],
@@ -569,19 +561,61 @@ class _FavoritesTab extends StatelessWidget {
       }
 
       return ListView.builder(
-        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
-        itemCount: favs.length + 1,
+        padding: EdgeInsets.fromLTRB(0, 8, 0, bottomInset + 80),
+        itemCount: favs.length + 2,
         itemBuilder: (context, index) {
-          if (index == favs.length) {
+          if (index == 0) {
+            // Action Header (Play All & Shuffle)
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => player.playQueue(favs, 0),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text("Play All", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final shuffled = List<SongModel>.from(favs)..shuffle();
+                        player.playQueue(shuffled, 0);
+                      },
+                      icon: const Icon(Icons.shuffle_rounded, size: 16),
+                      label: const Text("Shuffle", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textPrimary,
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (index == favs.length + 1) {
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
               child: _AuthActionCard(isAuth: isAuth),
             );
           }
-          final song = favs[index];
+
+          final song = favs[index - 1];
           return SongTile(
             song: song,
-            onTap: () => player.playQueue(favs, index),
+            onTap: () => player.playQueue(favs, index - 1),
           );
         },
       );
@@ -802,19 +836,44 @@ class _HistoryTab extends StatelessWidget {
       }
 
       return ListView.builder(
-        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
-        itemCount: history.length + 1,
+        padding: EdgeInsets.fromLTRB(0, 8, 0, bottomInset + 80),
+        itemCount: history.length + 2,
         itemBuilder: (context, index) {
-          if (index == history.length) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Recently Played (${history.length})",
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => userData.clearHistory(),
+                    icon: const Icon(Icons.clear_all_rounded, size: 16, color: AppTheme.textMuted),
+                    label: const Text("Clear All", style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (index == history.length + 1) {
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
               child: _AuthActionCard(isAuth: isAuth),
             );
           }
-          final song = history[index];
+
+          final song = history[index - 1];
           return SongTile(
             song: song,
-            onTap: () => player.playQueue(history, index),
+            onTap: () => player.playQueue(history, index - 1),
           );
         },
       );
@@ -861,19 +920,43 @@ class _DownloadsTab extends StatelessWidget {
       }
 
       return ListView.builder(
-        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
-        itemCount: items.length + 1,
+        padding: EdgeInsets.fromLTRB(0, 8, 0, bottomInset + 80),
+        itemCount: items.length + 2,
         itemBuilder: (context, index) {
-          if (index == items.length) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => player.playQueue(items, 0),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: Text("Play All (${items.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (index == items.length + 1) {
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
               child: _AuthActionCard(isAuth: isAuth),
             );
           }
-          final song = items[index];
+
+          final song = items[index - 1];
           return SongTile(
             song: song,
-            onTap: () => player.playQueue(items, index),
+            onTap: () => player.playQueue(items, index - 1),
           );
         },
       );
