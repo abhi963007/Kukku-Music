@@ -861,25 +861,56 @@ class _AlbumBadge extends StatelessWidget {
     );
   }
 }
-class _ArtistAvatar extends StatelessWidget {
+class _ArtistAvatar extends StatefulWidget {
   final String name;
   final VoidCallback onTap;
 
   const _ArtistAvatar({required this.name, required this.onTap});
 
   @override
+  State<_ArtistAvatar> createState() => _ArtistAvatarState();
+}
+
+class _ArtistAvatarState extends State<_ArtistAvatar> {
+  String? _resolvedUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolvedUrl = ArtistImages.urlFor(widget.name);
+    if (_resolvedUrl == null || _resolvedUrl!.isEmpty) {
+      ArtistImages.fetchDynamically(widget.name).then((url) {
+        if (mounted && url != null && url.isNotEmpty) {
+          setState(() => _resolvedUrl = url);
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const fallback = ColoredBox(
+    final fallback = Container(
       color: AppTheme.surfaceLight,
-      child: Center(child: Icon(Icons.person_rounded, color: AppTheme.primaryAccent, size: 24)),
+      child: Center(
+        child: Text(
+          widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '♪',
+          style: const TextStyle(
+            color: AppTheme.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+      ),
     );
+
+    final imgUrl = _resolvedUrl ?? ArtistImages.urlFor(widget.name);
 
     return Semantics(
       button: true,
-      label: 'Search for $name',
+      label: widget.name,
       child: InkWell(
         borderRadius: BorderRadius.circular(40),
-        onTap: onTap,
+        onTap: widget.onTap,
         child: SizedBox(
           width: 80,
           child: Column(
@@ -898,20 +929,22 @@ class _ArtistAvatar extends StatelessWidget {
                   child: SizedBox(
                     width: 58,
                     height: 58,
-                    child: CachedNetworkImage(
-                      imageUrl: ArtistImages.urlFor(name),
-                      fit: BoxFit.cover,
-                      memCacheWidth: 174,
-                      memCacheHeight: 174,
-                      placeholder: (_, _) => fallback,
-                      errorWidget: (_, _, _) => fallback,
-                    ),
+                    child: imgUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: imgUrl,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 174,
+                            memCacheHeight: 174,
+                            placeholder: (_, _) => fallback,
+                            errorWidget: (_, _, _) => fallback,
+                          )
+                        : fallback,
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                name,
+                widget.name,
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,

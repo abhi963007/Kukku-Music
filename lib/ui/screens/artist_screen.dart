@@ -28,10 +28,12 @@ class _ArtistScreenState extends State<ArtistScreen> {
   List<SongModel> _topSongs = [];
   List<AlbumModel> _albums = [];
   bool _isFollowing = false;
+  String? _resolvedAvatar;
 
   @override
   void initState() {
     super.initState();
+    _resolvedAvatar = ArtistImages.urlFor(widget.artistName);
     _fetchArtistData();
   }
 
@@ -46,10 +48,12 @@ class _ArtistScreenState extends State<ArtistScreen> {
       final results = await Future.wait([
         SaavnService.searchSongs("$name hits", limit: 30),
         SaavnService.searchAlbums(name, limit: 15),
+        ArtistImages.fetchDynamically(name),
       ]);
 
       final songs = results[0] as List<SongModel>;
       final albums = results[1] as List<AlbumModel>;
+      final resolvedImg = results[2] as String?;
 
       // If "$name hits" returned few results, fallback to search with just name
       List<SongModel> finalSongs = songs;
@@ -62,6 +66,9 @@ class _ArtistScreenState extends State<ArtistScreen> {
         setState(() {
           _topSongs = finalSongs;
           _albums = albums;
+          if (resolvedImg != null && resolvedImg.isNotEmpty) {
+            _resolvedAvatar = resolvedImg;
+          }
           _isLoading = false;
         });
       }
@@ -77,7 +84,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = ArtistImages.urlFor(widget.artistName);
+    final avatarUrl = _resolvedAvatar ?? ArtistImages.urlFor(widget.artistName);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
