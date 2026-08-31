@@ -1,8 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import 'package:get/get.dart';
+
 import '../../models/song_model.dart';
 import '../../utils/helper.dart';
+import '../screens/artist_screen.dart';
 import '../theme/app_theme.dart';
 
 class SongDetailsSheet extends StatelessWidget {
@@ -335,18 +338,32 @@ class SongDetailsSheet extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: tags.map((name) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
+                      return GestureDetector(
+                        onTap: () {
+                          Get.back();
+                          Get.to(() => ArtistScreen(artistName: name), transition: Transition.cupertino);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppTheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppTheme.primary),
+                            ],
                           ),
                         ),
                       );

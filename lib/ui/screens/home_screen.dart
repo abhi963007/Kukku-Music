@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/player_controller.dart';
-import '../../controllers/search_controller.dart';
 import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../../services/music_service.dart';
@@ -13,6 +12,7 @@ import '../widgets/shimmer.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/state_placeholder.dart';
 import 'album_sheet.dart';
+import 'artist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onNavigateTab;
@@ -447,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
               separatorBuilder: (_, _) => const SizedBox(width: 14),
               itemBuilder: (context, index) => _ArtistAvatar(
                 name: data.artists[index],
-                onTap: () => _searchArtist(data.artists[index]),
+                onTap: () => _openArtist(data.artists[index]),
               ),
             ),
           ),
@@ -508,9 +508,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  void _searchArtist(String artistName) {
-    Get.find<SearchViewController>().searchFor(artistName);
-    widget.onNavigateTab(1);
+  void _openArtist(String artistName) {
+    Get.to(() => ArtistScreen(artistName: artistName), transition: Transition.cupertino);
   }
 
   Widget _sectionHeader({
