@@ -1,6 +1,5 @@
-// ignore_for_file: constant_identifier_names
-
 import 'dart:convert';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
 
@@ -377,17 +376,14 @@ class MusicServices extends getx.GetxService {
   final Map<String, LanguageHomeData> _languageCache = {};
   final Map<String, DateTime> _languageCacheStamp = {};
 
-  /// How long a cached language section stays fresh.
-  static const Duration _cacheTtl = Duration(minutes: 30);
+  /// How long a cached language section stays fresh (5 minutes for freshness).
+  static const Duration _cacheTtl = Duration(minutes: 5);
 
-  /// Fetch categorized content for a specific language.
-  ///
-  /// [forceRefresh] bypasses the in-memory cache — without it, pull-to-refresh
-  /// on the home screen returned the same cached payload and appeared to do
-  /// nothing.
+  /// Fetch categorized content for a specific language with dynamic seed rotation and personalized mix.
   Future<LanguageHomeData> getLanguageHomeSections(
     String language, {
     bool forceRefresh = false,
+    List<SongModel> userSeeds = const [],
   }) async {
     final cached = _languageCache[language];
     final stamp = _languageCacheStamp[language];
@@ -399,25 +395,47 @@ class MusicServices extends getx.GetxService {
     try {
       final queries = _getQueriesForLanguage(language);
 
-      // Fetch trending, albums, movie hits, and melodies concurrently from JioSaavn API
-      final results = await Future.wait([
+      // Concurrent fetch for trending, albums, movie hits, and melodies
+      final futures = <Future<dynamic>>[
         SaavnService.searchSongs(queries.trendingQuery, limit: 30),
-        SaavnService.searchAlbums("${language == 'Trending' ? 'Latest' : language} Movie Soundtracks", limit: 20),
+        SaavnService.searchAlbums("${language == 'Trending' ? 'Latest' : language} Soundtracks", limit: 20),
         SaavnService.searchSongs(queries.movieHitsQuery, limit: 30),
-        SaavnService.searchSongs(queries.melodiesQuery, limit: 40),
-      ]);
+        SaavnService.searchSongs(queries.melodiesQuery, limit: 30),
+      ];
+
+      // Personalized Daily Mix generation based on user seeds
+      if (userSeeds.isNotEmpty) {
+        final topArtist = _extractTopArtist(userSeeds);
+        if (topArtist.isNotEmpty) {
+          futures.add(SaavnService.searchSongs("$topArtist hits", limit: 20));
+        } else {
+          futures.add(SaavnService.searchSongs("Weekly top chartbusters", limit: 20));
+        }
+      } else {
+        futures.add(SaavnService.searchSongs("Top viral songs", limit: 20));
+      }
+
+      final results = await Future.wait(futures);
 
       final trending = results[0] as List<SongModel>;
       final albums = results[1] as List<AlbumModel>;
       final movieHits = results[2] as List<SongModel>;
       final melodies = results[3] as List<SongModel>;
+      final dailyMix = results.length > 4 ? results[4] as List<SongModel> : <SongModel>[];
+
+      // Shuffle slightly for vibrant organic freshness
+      final organicTrending = List<SongModel>.from(trending);
+      if (organicTrending.length > 6) {
+        organicTrending.shuffle(Random());
+      }
 
       final data = LanguageHomeData(
         language: language,
-        trending: trending.isNotEmpty ? trending : await searchTracks(queries.trendingQuery),
+        trending: organicTrending.isNotEmpty ? organicTrending : await searchTracks(queries.trendingQuery),
         albums: albums,
         movieHits: movieHits.isNotEmpty ? movieHits : await searchTracks(queries.movieHitsQuery),
         topPicks: melodies.isNotEmpty ? melodies : (trending.isNotEmpty ? trending : []),
+        dailyMix: dailyMix,
         artists: queries.popularArtists,
       );
 
@@ -428,7 +446,6 @@ class MusicServices extends getx.GetxService {
       return data;
     } catch (e) {
       printERROR("Error fetching language sections for $language", e);
-      // Prefer stale content over an empty screen when the network is down.
       if (cached != null) return cached;
       return LanguageHomeData(
         language: language,
@@ -436,69 +453,173 @@ class MusicServices extends getx.GetxService {
         albums: [],
         movieHits: [],
         topPicks: [],
+        dailyMix: [],
         artists: _getQueriesForLanguage(language).popularArtists,
       );
     }
   }
 
+  String _extractTopArtist(List<SongModel> songs) {
+    final Map<String, int> counts = {};
+    for (final s in songs) {
+      final clean = s.artist.split(',').first.split('&').first.split('-').first.trim();
+      if (clean.isNotEmpty && clean != 'Various' && clean != 'Unknown Artist') {
+        counts[clean] = (counts[clean] ?? 0) + 1;
+      }
+    }
+    if (counts.isEmpty) return '';
+    var best = '';
+    var max = 0;
+    counts.forEach((k, v) {
+      if (v > max) {
+        max = v;
+        best = k;
+      }
+    });
+    return best;
+  }
+
   LanguageQueries _getQueriesForLanguage(String language) {
+    final rnd = Random();
     switch (language.toLowerCase()) {
       case 'malayalam':
+        const trendingPool = [
+          "Latest Malayalam songs 2024",
+          "Malayalam trending chartbusters",
+          "Top Malayalam viral hits",
+          "New Malayalam cinema hits",
+          "Malayalam feel good playlist",
+        ];
+        const moviePool = [
+          "Malayalam movie songs",
+          "Malayalam new film hits",
+          "Mollywood blockbusters",
+        ];
+        const melodyPool = [
+          "Malayalam melody evergreen",
+          "Malayalam acoustic love songs",
+          "Malayalam chill beats",
+        ];
         return LanguageQueries(
-          trendingQuery: "Malayalam trending hits",
-          movieHitsQuery: "Malayalam movie songs",
-          melodiesQuery: "Malayalam melody songs",
-          popularArtists: ["Sushin Shyam", "Vineeth Sreenivasan", "Anirudh", "K.J. Yesudas", "KS Chithra", "Shaan Rahman"],
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
+          popularArtists: ["Sushin Shyam", "Vineeth Sreenivasan", "Anirudh", "K.J. Yesudas", "KS Chithra", "Shaan Rahman", "Hesham Abdul Wahab", "Jakes Bejoy"],
         );
       case 'tamil':
+        const trendingPool = [
+          "Tamil trending hits 2024",
+          "Latest Tamil chartbusters",
+          "Top Tamil viral songs",
+          "New Tamil movie hits",
+        ];
+        const moviePool = [
+          "Tamil movie songs",
+          "Tamil blockbuster soundtracks",
+          "Kollywood hits",
+        ];
+        const melodyPool = [
+          "Tamil melody songs",
+          "Tamil acoustic melodies",
+          "Tamil romantic hits",
+        ];
         return LanguageQueries(
-          trendingQuery: "Tamil trending hits",
-          movieHitsQuery: "Tamil movie songs",
-          melodiesQuery: "Tamil melody songs",
-          popularArtists: ["Anirudh Ravichander", "A.R. Rahman", "Harris Jayaraj", "Yuvan Shankar Raja", "Sid Sriram", "Dhibu Ninan"],
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
+          popularArtists: ["Anirudh Ravichander", "A.R. Rahman", "Harris Jayaraj", "Yuvan Shankar Raja", "Sid Sriram", "Dhibu Ninan", "Santhosh Narayanan"],
         );
       case 'hindi':
+        const trendingPool = [
+          "Bollywood trending hits 2024",
+          "Latest Hindi chartbusters",
+          "Top 50 Hindi songs",
+          "New Bollywood viral songs",
+        ];
+        const moviePool = [
+          "Hindi movie soundtracks",
+          "Bollywood blockbuster songs",
+        ];
+        const melodyPool = [
+          "Hindi acoustic melodies",
+          "Arijit Singh soulful melodies",
+          "Hindi chill romantic songs",
+        ];
         return LanguageQueries(
-          trendingQuery: "Bollywood trending songs",
-          movieHitsQuery: "Hindi movie songs",
-          melodiesQuery: "Hindi melody songs",
-          popularArtists: ["Arijit Singh", "Shreya Ghoshal", "Pritam", "Vishal-Shekhar", "Atif Aslam", "Armaan Malik"],
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
+          popularArtists: ["Arijit Singh", "Shreya Ghoshal", "Pritam", "Vishal-Shekhar", "Atif Aslam", "Armaan Malik", "Sachin-Jigar", "B Praak"],
         );
       case 'telugu':
+        const trendingPool = [
+          "Telugu trending hits 2024",
+          "Latest Tollywood chartbusters",
+          "Top Telugu viral songs",
+        ];
+        const moviePool = ["Telugu movie songs", "Tollywood blockbuster songs"];
+        const melodyPool = ["Telugu melody songs", "Telugu acoustic melodies"];
         return LanguageQueries(
-          trendingQuery: "Telugu trending hits",
-          movieHitsQuery: "Telugu movie songs",
-          melodiesQuery: "Telugu melody songs",
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
           popularArtists: ["Thaman S", "Devi Sri Prasad", "Sid Sriram", "Anurag Kulkarni", "Armaan Malik", "Ram Miriyala"],
         );
       case 'kannada':
+        const trendingPool = ["Kannada trending hits 2024", "Latest Sandalwood hits", "Top Kannada songs"];
+        const moviePool = ["Kannada movie songs", "Kannada blockbuster tracks"];
+        const melodyPool = ["Kannada melody songs", "Kannada acoustic songs"];
         return LanguageQueries(
-          trendingQuery: "Kannada trending hits",
-          movieHitsQuery: "Kannada movie songs",
-          melodiesQuery: "Kannada melody songs",
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
           popularArtists: ["Ravi Basrur", "Arjun Janya", "Charan Raj", "Sanjith Hegde", "Vijay Prakash"],
         );
       case 'punjabi':
+        const trendingPool = ["Punjabi trending hits 2024", "Top Punjabi pop songs", "Viral Punjabi tracks"];
+        const moviePool = ["Top Punjabi hits", "Punjabi dance tracks"];
+        const melodyPool = ["Best Punjabi romantic songs", "Punjabi acoustic songs"];
         return LanguageQueries(
-          trendingQuery: "Punjabi trending hits",
-          movieHitsQuery: "Top Punjabi pop songs",
-          melodiesQuery: "Best Punjabi romantic songs",
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
           popularArtists: ["Diljit Dosanjh", "Karan Aujla", "AP Dhillon", "Shubh", "Sidhu Moose Wala", "Guru Randhawa"],
         );
       case 'english':
+        const trendingPool = ["Billboard top hits 2024", "Global viral pop", "Top English chartbusters"];
+        const moviePool = ["Popular movie soundtracks", "Global cinema hits"];
+        const melodyPool = ["Chill pop melodies", "Acoustic pop favorites"];
         return LanguageQueries(
-          trendingQuery: "Billboard top hits",
-          movieHitsQuery: "Popular movie soundtracks",
-          melodiesQuery: "Chill pop melodies",
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
           popularArtists: ["The Weeknd", "Taylor Swift", "Ed Sheeran", "Dua Lipa", "Bruno Mars", "Billie Eilish"],
         );
       case 'trending':
       default:
+        const trendingPool = [
+          "Top 50 India viral hits",
+          "Trending chartbusters 2024",
+          "Global top hits India",
+          "Latest viral trending songs",
+          "Weekly top Indian music",
+          "Hot new releases India",
+        ];
+        const moviePool = [
+          "Blockbuster movie songs",
+          "Cinema soundtrack hits",
+          "All time popular Indian songs",
+        ];
+        const melodyPool = [
+          "Acoustic chill melodies",
+          "Soulful melodies & pop",
+          "Feel good acoustic vibes",
+        ];
         return LanguageQueries(
-          trendingQuery: "Trending songs 2025",
-          movieHitsQuery: "Popular movie songs",
-          melodiesQuery: "Popular acoustic melodies",
-          popularArtists: ["The Weeknd", "Taylor Swift", "Anirudh", "Arijit Singh", "Ed Sheeran", "Dua Lipa"],
+          trendingQuery: trendingPool[rnd.nextInt(trendingPool.length)],
+          movieHitsQuery: moviePool[rnd.nextInt(moviePool.length)],
+          melodiesQuery: melodyPool[rnd.nextInt(melodyPool.length)],
+          popularArtists: ["Anirudh", "Arijit Singh", "Sushin Shyam", "The Weeknd", "Taylor Swift", "Ed Sheeran", "Shreya Ghoshal", "Dua Lipa"],
         );
     }
   }
@@ -516,6 +637,7 @@ class LanguageHomeData {
   final List<AlbumModel> albums;
   final List<SongModel> movieHits;
   final List<SongModel> topPicks;
+  final List<SongModel> dailyMix;
   final List<String> artists;
 
   LanguageHomeData({
@@ -524,6 +646,7 @@ class LanguageHomeData {
     this.albums = const [],
     required this.movieHits,
     required this.topPicks,
+    this.dailyMix = const [],
     required this.artists,
   });
 }
