@@ -1,28 +1,24 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_to_playlist_sheet.dart';
+import '../widgets/lyrics_sheet.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/palette_background.dart';
 import '../widgets/progress_slider.dart';
-import '../widgets/scrolling_text.dart';
 import '../widgets/song_details_sheet.dart';
 import '../widgets/state_placeholder.dart';
+import '../widgets/yt_track_options_sheet.dart';
 import 'player_layout.dart';
 
-/// Full-screen player.
-///
-/// Layout is driven by [LayoutBuilder] rather than fixed fractions of the screen
-/// width. The previous version sized the artwork at `width * 0.76` inside a
-/// `spaceBetween` Column that also held two `Spacer`s, which overflowed in
-/// landscape and at large system font scales.
+/// Full-screen player in YouTube Music style.
 class PlayerScreen extends StatelessWidget {
   const PlayerScreen({super.key});
 
@@ -34,8 +30,7 @@ class PlayerScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       body: Stack(
         children: [
-          // Keyed on the art URL alone so position ticks never rebuild the
-          // blur + palette work.
+          // Dynamic palette ambient backdrop
           Positioned.fill(
             child: Obx(() => PaletteBackground(
                   artUri: playerController.currentSong.value?.artUri ?? '',
@@ -60,19 +55,17 @@ class PlayerScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildLayout(BuildContext context, BoxConstraints c, SongModel song) {
     if (PlayerLayout.isWide(c.maxWidth, c.maxHeight)) {
       return _landscapeLayout(context, c, song);
     }
 
-    // Artwork is sized from the space actually left over (see PlayerLayout), so
-    // the column can never overflow. A null result means the viewport is too
-    // short for artwork at all.
     final artSize = PlayerLayout.portraitArtworkSize(c.maxWidth, c.maxHeight);
     if (artSize == null) return _compactLayout(context, song);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           _TopBar(song: song),
@@ -82,24 +75,25 @@ class PlayerScreen extends StatelessWidget {
             ),
           ),
           _TrackMeta(song: song),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+          _ActionPillsRow(song: song),
+          const SizedBox(height: 14),
           const _ProgressSection(),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           const _ControlsRow(),
           const SizedBox(height: 10),
-          _BottomActions(song: song),
-          const SizedBox(height: 8),
+          _BottomUpNextBar(song: song),
+          const SizedBox(height: 6),
         ],
       ),
     );
   }
-  /// Side-by-side layout for landscape and large tablets, where a square that
-  /// fills the width would leave no room for the controls.
+
   Widget _landscapeLayout(BuildContext context, BoxConstraints c, SongModel song) {
     final artSize = PlayerLayout.landscapeArtworkSize(c.maxWidth, c.maxHeight);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -113,12 +107,14 @@ class PlayerScreen extends StatelessWidget {
                   _TopBar(song: song, compact: true),
                   const SizedBox(height: 8),
                   _TrackMeta(song: song),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
+                  _ActionPillsRow(song: song),
+                  const SizedBox(height: 12),
                   const _ProgressSection(),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   const _ControlsRow(),
-                  const SizedBox(height: 8),
-                  _BottomActions(song: song),
+                  const SizedBox(height: 6),
+                  _BottomUpNextBar(song: song),
                 ],
               ),
             ),
@@ -127,34 +123,36 @@ class PlayerScreen extends StatelessWidget {
       ),
     );
   }
-  /// Very short viewports (split screen, tiny devices, huge font scale):
-  /// everything scrolls rather than overflowing.
+
   Widget _compactLayout(BuildContext context, SongModel song) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         children: [
           _TopBar(song: song),
           const SizedBox(height: 12),
           _Artwork(song: song, size: 160),
-          const SizedBox(height: 16),
-          _TrackMeta(song: song),
           const SizedBox(height: 14),
+          _TrackMeta(song: song),
+          const SizedBox(height: 12),
+          _ActionPillsRow(song: song),
+          const SizedBox(height: 12),
           const _ProgressSection(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const _ControlsRow(),
           const SizedBox(height: 8),
-          _BottomActions(song: song),
+          _BottomUpNextBar(song: song),
         ],
       ),
     );
   }
+
   static void showQueueSheet(BuildContext context) {
     final controller = Get.find<PlayerController>();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: const Color(0xFF1E1E1E),
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
@@ -164,6 +162,7 @@ class PlayerScreen extends StatelessWidget {
   }
 }
 
+/// 1. Top Bar: Chevron down + Audio/Video Switcher + Cast + 3-dots Menu (YT Music)
 class _TopBar extends StatelessWidget {
   final SongModel song;
   final bool compact;
@@ -173,71 +172,86 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
           color: AppTheme.textPrimary,
           tooltip: 'Close player',
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        Expanded(
-          child: Column(
+
+        // Audio / Video Toggle Pill (YouTube Music style)
+        Container(
+          height: 34,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: Colors.black45,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                song.album.isNotEmpty && song.album != 'Unknown Album'
-                    ? song.album.toUpperCase()
-                    : 'PLAYING FROM STREAM',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 10.5,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.headphones_rounded, size: 16, color: Colors.white),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Get.rawSnackbar(
+                    message: "High Quality Audio Stream Active 🎵",
+                    duration: const Duration(seconds: 2),
+                    margin: const EdgeInsets.all(16),
+                    borderRadius: 12,
+                    backgroundColor: AppTheme.surface,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  child: const Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white54),
                 ),
               ),
-              const SizedBox(height: 3),
-              const _AudioBadge(),
             ],
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.queue_music_rounded, size: 26),
-          color: AppTheme.textPrimary,
-          tooltip: 'Playing queue',
-          onPressed: () => PlayerScreen.showQueueSheet(context),
+
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.cast_rounded, size: 22),
+              color: AppTheme.textPrimary,
+              tooltip: 'Cast',
+              onPressed: () {
+                Get.rawSnackbar(
+                  message: "Casting devices will appear when available",
+                  duration: const Duration(seconds: 2),
+                  margin: const EdgeInsets.all(16),
+                  borderRadius: 12,
+                  backgroundColor: AppTheme.surface,
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.more_vert_rounded, size: 24),
+              color: AppTheme.textPrimary,
+              tooltip: 'Track options',
+              onPressed: () => YtTrackOptionsSheet.show(context, song),
+            ),
+          ],
         ),
       ],
     );
   }
 }
-class _AudioBadge extends StatelessWidget {
-  const _AudioBadge();
 
-  @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<PlayerController>();
-    return Obx(() => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35), width: 0.8),
-          ),
-          child: Text(
-            controller.audioBadge.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppTheme.primaryAccent,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ));
-  }
-}
+/// 2. Artwork: Smooth rounded square (YT Music)
 class _Artwork extends StatelessWidget {
   final SongModel song;
   final double size;
@@ -246,38 +260,32 @@ class _Artwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<PlayerController>();
-    // Artwork is a fixed square, so the source is decoded at the size actually
-    // painted (device pixels), avoiding full-resolution decodes of 500x500+ art.
     final decodeSide = (size * MediaQuery.devicePixelRatioOf(context)).round();
 
-    return Obx(() {
-      final isPlaying = controller.isPlaying.value;
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOut,
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isPlaying ? 0.55 : 0.35),
-              blurRadius: isPlaying ? 34 : 20,
-              spreadRadius: isPlaying ? 2 : 0,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Hero(
-          tag: kPlayerArtHeroTag,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            child: _artImage(decodeSide),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 28,
+            spreadRadius: 1,
+            offset: Offset(0, 10),
           ),
+        ],
+      ),
+      child: Hero(
+        tag: kPlayerArtHeroTag,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: _artImage(decodeSide),
         ),
-      );
-    });
+      ),
+    );
   }
 
   Widget _artImage(int decodeSide) {
@@ -293,12 +301,14 @@ class _Artwork extends StatelessWidget {
       fit: BoxFit.cover,
       memCacheWidth: decodeSide,
       memCacheHeight: decodeSide,
-      fadeInDuration: const Duration(milliseconds: 250),
+      fadeInDuration: const Duration(milliseconds: 200),
       placeholder: (_, _) => const ColoredBox(color: AppTheme.surfaceLight),
       errorWidget: (_, _, _) => fallback,
     );
   }
 }
+
+/// 3. Track Metadata: Title with '>' chevron + Artist (YT Music)
 class _TrackMeta extends StatelessWidget {
   final SongModel song;
 
@@ -306,65 +316,199 @@ class _TrackMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userData = Get.find<UserDataController>();
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => SongDetailsSheet.show(context, song),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Long titles scroll instead of being truncated.
-              ScrollingText(
-                text: song.title,
-                height: 28,
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  song.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
-              ScrollingText(
-                text: song.artist,
-                height: 22,
-                velocity: 22,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 24),
             ],
           ),
         ),
-        const SizedBox(width: 8),
-        Obx(() {
-          final isFav = userData.isFavorite(song.id);
-          return IconButton(
-            iconSize: 28,
-            splashRadius: 24,
-            tooltip: isFav ? 'Remove from favorites' : 'Add to favorites',
-            icon: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-              child: Icon(
-                isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                key: ValueKey<bool>(isFav),
-                color: isFav ? Colors.redAccent : AppTheme.textMuted,
-              ),
-            ),
-            onPressed: () => userData.toggleFavorite(song),
-          );
-        }),
+        const SizedBox(height: 2),
+        Text(
+          song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
 }
 
-/// Progress bar + time labels. Isolated so the rest of the player does not
-/// rebuild on every position tick.
+/// 4. Action Pills Row (YouTube Music Action Bar: Like/Dislike, Lyrics, Credits, Save)
+class _ActionPillsRow extends StatelessWidget {
+  final SongModel song;
+
+  const _ActionPillsRow({required this.song});
+
+  @override
+  Widget build(BuildContext context) {
+    final userData = Get.find<UserDataController>();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          // 1. Like / Dislike Segmented Pill
+          Obx(() {
+            final isFav = userData.isFavorite(song.id);
+            return Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF282828),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                    onTap: () => userData.toggleFavorite(song),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isFav ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
+                            size: 18,
+                            color: isFav ? AppTheme.primary : Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isFav ? "Liked" : "Like",
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: isFav ? AppTheme.primary : Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(width: 1, height: 18, color: Colors.white12),
+                  InkWell(
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(20)),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Get.rawSnackbar(
+                        message: "We'll tune your recommendations",
+                        duration: const Duration(seconds: 2),
+                        margin: const EdgeInsets.all(16),
+                        borderRadius: 12,
+                        backgroundColor: AppTheme.surface,
+                      );
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(Icons.thumb_down_alt_outlined, size: 18, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(width: 8),
+
+          // 2. Lyrics Pill
+          _ActionPill(
+            icon: Icons.lyrics_outlined,
+            label: "Lyrics",
+            onTap: () => LyricsSheet.show(context, song),
+          ),
+
+          const SizedBox(width: 8),
+
+          // 3. Credits / Story Pill
+          _ActionPill(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: "Credits",
+            onTap: () => SongDetailsSheet.show(context, song),
+          ),
+
+          const SizedBox(width: 8),
+
+          // 4. Save to Playlist Pill
+          _ActionPill(
+            icon: Icons.playlist_add_rounded,
+            label: "Save",
+            onTap: () => AddToPlaylistSheet.show(context, song),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionPill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF282828),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 5. Progress Section: Slim seek bar with elapsed time & remaining/total duration
 class _ProgressSection extends StatelessWidget {
   const _ProgressSection();
 
@@ -379,6 +523,8 @@ class _ProgressSection extends StatelessWidget {
         ));
   }
 }
+
+/// 6. Playback Controls Row (Shuffle, Previous, Big Circular Play/Pause, Next, Repeat)
 class _ControlsRow extends StatelessWidget {
   const _ControlsRow();
 
@@ -393,21 +539,21 @@ class _ControlsRow extends StatelessWidget {
           final on = controller.isShuffle.value;
           return IconButton(
             icon: const Icon(Icons.shuffle_rounded, size: 24),
-            color: on ? AppTheme.primary : AppTheme.textMuted,
+            color: on ? AppTheme.primary : Colors.white70,
             tooltip: on ? 'Shuffle on' : 'Shuffle off',
             onPressed: controller.toggleShuffle,
           );
         }),
         IconButton(
-          icon: const Icon(Icons.skip_previous_rounded, size: 36),
-          color: AppTheme.textPrimary,
+          icon: const Icon(Icons.skip_previous_rounded, size: 40),
+          color: Colors.white,
           tooltip: 'Previous track',
           onPressed: controller.skipPrevious,
         ),
         const _PlayPauseButton(),
         IconButton(
-          icon: const Icon(Icons.skip_next_rounded, size: 36),
-          color: AppTheme.textPrimary,
+          icon: const Icon(Icons.skip_next_rounded, size: 40),
+          color: Colors.white,
           tooltip: 'Next track',
           onPressed: controller.skipNext,
         ),
@@ -420,7 +566,7 @@ class _ControlsRow extends StatelessWidget {
                   : Icons.repeat_rounded,
               size: 24,
             ),
-            color: mode != AudioServiceRepeatMode.none ? AppTheme.primary : AppTheme.textMuted,
+            color: mode != AudioServiceRepeatMode.none ? AppTheme.primary : Colors.white70,
             tooltip: controller.repeatLabel,
             onPressed: controller.toggleRepeat,
           );
@@ -429,6 +575,7 @@ class _ControlsRow extends StatelessWidget {
     );
   }
 }
+
 class _PlayPauseButton extends StatelessWidget {
   const _PlayPauseButton();
 
@@ -447,14 +594,14 @@ class _PlayPauseButton extends StatelessWidget {
           child: Container(
             width: 68,
             height: 68,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: AppTheme.primaryGradient,
+              color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
+                  color: Colors.black45,
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
@@ -464,16 +611,14 @@ class _PlayPauseButton extends StatelessWidget {
                       width: 28,
                       height: 28,
                       child: CircularProgressIndicator(
-                        // On the white gradient button a white spinner was
-                        // invisible.
-                        color: AppTheme.background,
-                        strokeWidth: 2.5,
+                        strokeWidth: 3,
+                        color: Colors.black,
                       ),
                     )
                   : Icon(
                       isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: AppTheme.background,
                       size: 38,
+                      color: Colors.black,
                     ),
             ),
           ),
@@ -482,139 +627,58 @@ class _PlayPauseButton extends StatelessWidget {
     });
   }
 }
-class _BottomActions extends StatelessWidget {
+
+/// 7. Bottom Up Next Bar (YouTube Music Style: Drag handle + Station/Queue name)
+class _BottomUpNextBar extends StatelessWidget {
   final SongModel song;
 
-  const _BottomActions({required this.song});
+  const _BottomUpNextBar({required this.song});
 
   @override
   Widget build(BuildContext context) {
-    final downloads = Get.find<DownloadViewController>();
+    final controller = Get.find<PlayerController>();
 
-    return Obx(() {
-      final isDownloading = downloads.downloader.isDownloading(song.id);
-      final isDownloaded = downloads.downloader.isDownloaded(song.id);
-      final progress = downloads.downloader.getProgress(song.id);
-
-      Widget downloadWidget;
-
-      if (isDownloading) {
-        downloadWidget = _pill(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  value: progress > 0 ? progress / 100 : null,
-                  strokeWidth: 2,
-                  color: AppTheme.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text('Downloading $progress%',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
-            ],
-          ),
-        );
-      } else if (isDownloaded) {
-        downloadWidget = _pill(
-          borderColor: AppTheme.success.withValues(alpha: 0.3),
-          background: AppTheme.success.withValues(alpha: 0.12),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.download_done_rounded, color: AppTheme.success, size: 16),
-              SizedBox(width: 6),
-              Text('Offline',
-                  style: TextStyle(
-                      color: AppTheme.success, fontSize: 12, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        );
-      } else {
-        downloadWidget = TextButton.icon(
-          style: TextButton.styleFrom(
-            foregroundColor: AppTheme.textSecondary,
-            backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusLg)),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          ),
-          icon: const Icon(Icons.download_rounded, size: 16),
-          label: const Text('Download', style: TextStyle(fontSize: 12)),
-          onPressed: () => downloads.download(song),
-        );
-      }
-
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => PlayerScreen.showQueueSheet(context),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          downloadWidget,
-          const SizedBox(width: 8),
-          InkWell(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            onTap: () => AddToPlaylistSheet.show(context, song),
-            child: _pill(
-              background: AppTheme.surfaceLight.withValues(alpha: 0.6),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.playlist_add_rounded, color: AppTheme.textSecondary, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Playlist',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
+          Container(
+            width: 32,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white30,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
-          InkWell(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            onTap: () => SongDetailsSheet.show(context, song),
-            child: _pill(
-              background: AppTheme.surfaceLight.withValues(alpha: 0.6),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Details',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    });
-  }
+          const SizedBox(height: 6),
+          Obx(() {
+            final queueLen = controller.queue.length;
+            final subtitle = queueLen > 0
+                ? "Up Next • $queueLen tracks in queue"
+                : (song.album.isNotEmpty && song.album != 'Unknown Album'
+                    ? "${song.album} Mix"
+                    : "Continuous Auto Radio");
 
-  Widget _pill({required Widget child, Color? background, Color? borderColor}) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: AppTheme.minTouchTarget - 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: background ?? AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: borderColor != null ? Border.all(color: borderColor) : null,
+            return Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+              ),
+            );
+          }),
+        ],
       ),
-      child: Center(child: child),
     );
   }
 }
+
+/// 8. Queue Bottom Sheet
 class _QueueSheet extends StatelessWidget {
   final PlayerController controller;
 
@@ -622,17 +686,15 @@ class _QueueSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // `useSafeArea: true` on the sheet handles the top inset; the bottom inset
-    // is applied to the list so the final row clears the navigation bar.
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.65,
+      height: MediaQuery.sizeOf(context).height * 0.7,
       child: Column(
         children: [
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
               color: Colors.white24,
@@ -640,14 +702,17 @@ class _QueueSheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 4),
             child: Row(
               children: [
                 const Expanded(
                   child: Text(
-                    'Playing Queue',
+                    'Up Next',
                     style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -660,13 +725,14 @@ class _QueueSheet extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(color: Colors.white10, height: 1),
           Expanded(child: _QueueList(controller: controller, bottomInset: bottomInset)),
         ],
       ),
     );
   }
 }
+
 class _QueueList extends StatelessWidget {
   final PlayerController controller;
   final double bottomInset;
@@ -685,12 +751,10 @@ class _QueueList extends StatelessWidget {
         );
       }
 
-      // Compare by index, not by song id: the same track can legitimately
-      // appear more than once and the old id check highlighted every copy.
       final activeIndex = controller.currentQueueIndex.value;
 
       return ListView.builder(
-        padding: EdgeInsets.only(bottom: bottomInset + 12),
+        padding: EdgeInsets.only(bottom: bottomInset + 16),
         itemCount: queue.length,
         itemExtent: 64,
         itemBuilder: (context, index) {
@@ -705,7 +769,9 @@ class _QueueList extends StatelessWidget {
                       '${index + 1}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+                        color: AppTheme.textMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
             title: Text(
@@ -724,6 +790,10 @@ class _QueueList extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
+            trailing: IconButton(
+              icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMuted, size: 18),
+              onPressed: () => YtTrackOptionsSheet.show(context, item),
+            ),
             onTap: () => controller.skipToQueueItem(index),
           );
         },
@@ -731,4 +801,3 @@ class _QueueList extends StatelessWidget {
     });
   }
 }
-

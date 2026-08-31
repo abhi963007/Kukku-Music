@@ -4,11 +4,10 @@ import 'package:get/get.dart';
 
 import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
-import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../../utils/helper.dart';
 import '../theme/app_theme.dart';
-import 'add_to_playlist_sheet.dart';
+import 'yt_track_options_sheet.dart';
 
 class SongTile extends StatelessWidget {
   final SongModel song;
@@ -188,111 +187,10 @@ class _SongMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playerController = Get.find<PlayerController>();
-    final downloadController = Get.find<DownloadViewController>();
-    final userData = Get.find<UserDataController>();
-
-    final isFav = userData.isFavorite(song.id);
-
-    return PopupMenuButton<String>(
+    return IconButton(
       icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary, size: 20),
       tooltip: 'Track options',
-      onSelected: (value) async {
-        switch (value) {
-          case 'favorite':
-            await userData.toggleFavorite(song);
-          case 'add_playlist':
-            if (context.mounted) AddToPlaylistSheet.show(context, song);
-          case 'play_next':
-            await playerController.addToQueue(song);
-            Get.snackbar(
-              'Queue',
-              "Added '${song.title}' to queue",
-              snackPosition: SnackPosition.BOTTOM,
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 2),
-            );
-          case 'download':
-            await downloadController.download(song);
-          case 'delete':
-            await downloadController.removeDownload(song.id);
-          case 'remove_recent':
-            onRemoveFromRecent?.call();
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'favorite',
-          child: _MenuRow(
-            icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            label: isFav ? 'Remove from Favorites' : 'Add to Favorites',
-            iconColor: isFav ? Colors.redAccent : null,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'add_playlist',
-          child: _MenuRow(icon: Icons.playlist_add_rounded, label: 'Add to Playlist'),
-        ),
-        const PopupMenuItem(
-          value: 'play_next',
-          child: _MenuRow(icon: Icons.queue_music_rounded, label: 'Play Next / Queue'),
-        ),
-        if (!isDownloaded)
-          const PopupMenuItem(
-            value: 'download',
-            child: _MenuRow(icon: Icons.download_rounded, label: 'Download'),
-          )
-        else
-          const PopupMenuItem(
-            value: 'delete',
-            child: _MenuRow(
-              icon: Icons.delete_outline_rounded,
-              label: 'Remove Download',
-              muted: true,
-            ),
-          ),
-        if (onRemoveFromRecent != null)
-          const PopupMenuItem(
-            value: 'remove_recent',
-            child: _MenuRow(
-              icon: Icons.history_toggle_off_rounded,
-              label: 'Remove from History',
-              muted: true,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _MenuRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool muted;
-  final Color? iconColor;
-
-  const _MenuRow({
-    required this.icon,
-    required this.label,
-    this.muted = false,
-    this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = muted ? AppTheme.textSecondary : AppTheme.textPrimary;
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: iconColor ?? color),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: color),
-          ),
-        ),
-      ],
+      onPressed: () => YtTrackOptionsSheet.show(context, song),
     );
   }
 }

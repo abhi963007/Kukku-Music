@@ -331,9 +331,38 @@ class SaavnService {
         songs: albumSongs,
       );
     } catch (e) {
-      printERROR("SaavnService getAlbumDetails error for $albumId", e);
+      printERROR("SaavnService getAlbumDetails error for '$albumId'", e);
       return null;
     }
+  }
+
+  /// Fetch lyrics for a song if available from JioSaavn
+  static Future<String?> getLyrics(String songId) async {
+    if (songId.trim().isEmpty) return null;
+    try {
+      final res = await _dio.get(
+        'https://www.jiosaavn.com/api.php',
+        queryParameters: {
+          '__call': 'lyrics.getLyrics',
+          'lyrics_id': songId,
+          'ctx': 'web6dot0',
+          'api_version': '4',
+          '_format': 'json',
+        },
+      );
+
+      final dynamic rawData = res.data is String ? jsonDecode(res.data) : res.data;
+      final map = asStringMap(rawData);
+      final rawLyrics = asText(map['lyrics']);
+      if (rawLyrics.isNotEmpty) {
+        return rawLyrics
+            .replaceAll('<br>', '\n')
+            .replaceAll('<br/>', '\n')
+            .replaceAll('<br />', '\n')
+            .trim();
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Get endless related song recommendations for auto-playing continuous music
