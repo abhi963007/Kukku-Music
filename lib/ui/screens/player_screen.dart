@@ -169,8 +169,6 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playerController = Get.find<PlayerController>();
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -182,40 +180,19 @@ class _TopBar extends StatelessWidget {
         ),
 
         Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                song.album.isNotEmpty && song.album != 'Unknown Album'
-                    ? song.album.toUpperCase()
-                    : 'PLAYING FROM STREAM',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Obx(() => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      playerController.audioBadge.value,
-                      style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )),
-            ],
+          child: Text(
+            song.album.isNotEmpty && song.album != 'Unknown Album'
+                ? song.album.toUpperCase()
+                : 'PLAYING FROM STREAM',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 11.5,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
 

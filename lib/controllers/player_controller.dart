@@ -133,16 +133,12 @@ class PlayerController extends GetxController {
   /// or a string bitrate.
   String _badgeFor(MediaItem item) {
     final extras = item.extras;
-    final url = asText(extras?['url']);
-    if (url.startsWith('file://')) return 'OFFLINE';
-
     final codec = asText(extras?['codec']).toUpperCase();
     final bitrate = asInt(extras?['bitrate']);
     if (codec.isNotEmpty && codec != 'OFFLINE' && bitrate > 0) {
       return '$codec • ${(bitrate / 1000).round()}kbps';
     }
-    if (codec.isNotEmpty && codec != 'OFFLINE') return codec;
-    return 'HQ STREAM';
+    return '320kbps HD';
   }
 
   void _showPlaybackError(String message) {
