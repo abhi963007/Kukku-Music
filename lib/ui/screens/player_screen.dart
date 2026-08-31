@@ -337,7 +337,7 @@ class _TrackMeta extends StatelessWidget {
   }
 }
 
-/// 4. Action Pills Row (YouTube Music Action Bar: Like/Dislike, Lyrics, Credits, Save)
+/// 4. Action Pills Row (YouTube Music Action Bar: Fav, Credits, Save)
 class _ActionPillsRow extends StatelessWidget {
   final SongModel song;
 
@@ -347,13 +347,11 @@ class _ActionPillsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final userData = Get.find<UserDataController>();
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          // 1. Fav (Favorite) Pill
-          Obx(() {
+    return Row(
+      children: [
+        // 1. Fav (Favorite) Pill
+        Expanded(
+          child: Obx(() {
             final isFav = userData.isFavorite(song.id);
             return _ActionPill(
               icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -363,26 +361,30 @@ class _ActionPillsRow extends StatelessWidget {
               onTap: () => userData.toggleFavorite(song),
             );
           }),
+        ),
 
-          const SizedBox(width: 8),
+        const SizedBox(width: 10),
 
-          // 2. Credits / Info Pill
-          _ActionPill(
+        // 2. Credits / Info Pill
+        Expanded(
+          child: _ActionPill(
             icon: Icons.info_outline_rounded,
             label: "Credits",
             onTap: () => SongDetailsSheet.show(context, song),
           ),
+        ),
 
-          const SizedBox(width: 8),
+        const SizedBox(width: 10),
 
-          // 3. Save to Playlist Pill
-          _ActionPill(
+        // 3. Save to Playlist Pill
+        Expanded(
+          child: _ActionPill(
             icon: Icons.playlist_add_rounded,
             label: "Save",
             onTap: () => AddToPlaylistSheet.show(context, song),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -408,23 +410,30 @@ class _ActionPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        height: 40,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF282828),
+          color: const Color(0xFF262626),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 18, color: iconColor ?? Colors.white),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: textColor ?? Colors.white,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: textColor ?? Colors.white,
+                ),
               ),
             ),
           ],

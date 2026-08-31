@@ -50,7 +50,7 @@ class AudioProgressSlider extends StatelessWidget {
       thumbRadius: 6.0,
       thumbGlowRadius: 18.0,
       timeLabelLocation: TimeLabelLocation.below,
-      timeLabelType: TimeLabelType.remainingTime,
+      timeLabelType: TimeLabelType.totalTime,
       timeLabelTextStyle: const TextStyle(
         color: AppTheme.textSecondary,
         fontSize: 12,
