@@ -315,19 +315,25 @@ class SongDetailsSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          SizedBox(
+            width: 110,
             child: Text(
               role,
               style: const TextStyle(color: AppTheme.textMuted, fontSize: 12.5),
             ),
           ),
-          Text(
-            name,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
