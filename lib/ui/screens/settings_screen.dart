@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/download_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../services/groq_ai_service.dart';
@@ -30,6 +31,9 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 20),
+            _SectionHeader("Account"),
+            _UserProfileCard(),
+            SizedBox(height: 24),
             _SectionHeader("Groq AI Engine"),
             _AiSettingsCard(),
             SizedBox(height: 24),
@@ -615,6 +619,151 @@ class _AiSettingsCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _UserProfileCard extends StatelessWidget {
+  const _UserProfileCard();
+
+  void _showLogoutDialog(BuildContext context, AuthController auth) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
+        title: const Text('Sign Out', style: TextStyle(color: AppTheme.textPrimary)),
+        content: const Text(
+          'Are you sure you want to sign out of your Kukku account?',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              auth.signOut();
+            },
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Get.find<AuthController>();
+
+    return _SettingsCard(
+      padding: const EdgeInsets.all(16),
+      child: Obx(() {
+        final name = auth.userName;
+        final email = auth.userEmail;
+        final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+
+        return Row(
+          children: [
+            // User Avatar / Initials
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primary, AppTheme.primaryAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+
+            // Name & Email
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
+                        ),
+                        child: const Text(
+                          'Active',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    email.isNotEmpty ? email : 'Signed in with Supabase',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Sign Out Button
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
+              tooltip: 'Sign Out',
+              onPressed: () => _showLogoutDialog(context, auth),
+            ),
+          ],
+        );
+      }),
     );
   }
 }

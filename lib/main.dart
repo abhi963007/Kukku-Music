@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'controllers/auth_controller.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/player_controller.dart';
 import 'controllers/search_controller.dart';
@@ -15,6 +16,7 @@ import 'services/audio_handler.dart';
 import 'services/downloader.dart';
 import 'services/groq_ai_service.dart';
 import 'services/music_service.dart';
+import 'services/supabase_service.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme/app_theme.dart';
 import 'utils/helper.dart';
@@ -45,6 +47,7 @@ void main() {
 
     await _configureSystemChrome();
     await _initStorage();
+    await SupabaseService.initialize();
 
     // Initialize background AudioService. If this fails the app must still run,
     // so fall back to an un-backgrounded handler rather than crashing.
@@ -58,6 +61,7 @@ void main() {
     }
 
     // Register GetX global services and controllers
+    Get.put<AuthController>(AuthController(), permanent: true);
     Get.put<MyAudioHandler>(myAudioHandler, permanent: true);
     Get.put<MusicServices>(MusicServices(), permanent: true);
     Get.put<DownloaderService>(DownloaderService(), permanent: true);

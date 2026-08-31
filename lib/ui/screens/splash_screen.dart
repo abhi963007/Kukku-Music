@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../controllers/auth_controller.dart';
 import '../theme/app_theme.dart';
+import 'auth/login_screen.dart';
 import 'main_navigation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -34,11 +36,20 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _goToApp() {
     if (!mounted) return;
-    Get.off(
-      () => const MainNavigationScreen(),
-      transition: Transition.fadeIn,
-      duration: const Duration(milliseconds: 350),
-    );
+    final authController = Get.find<AuthController>();
+    if (authController.isLoggedIn) {
+      Get.off(
+        () => const MainNavigationScreen(),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 350),
+      );
+    } else {
+      Get.off(
+        () => const LoginScreen(),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 350),
+      );
+    }
   }
 
   @override
