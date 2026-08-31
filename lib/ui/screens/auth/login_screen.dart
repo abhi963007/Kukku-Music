@@ -222,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _authController.isLoading.value ? null : _handleSignIn,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: Colors.black,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       height: 22,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.5,
-                                        color: Colors.white,
+                                        color: Colors.black,
                                       ),
                                     )
                                   : const Text(
@@ -243,6 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.3,
+                                        color: Colors.black,
                                       ),
                                     ),
                             ),

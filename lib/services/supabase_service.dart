@@ -66,13 +66,15 @@ class SupabaseService {
     await client.auth.resetPasswordForEmail(email.trim());
   }
 
+  static const String defaultWebClientId = '129676481545-kaonqcho5p7c2drdlcs5st40e9btaan4.apps.googleusercontent.com';
+
   /// Sign In with Google OAuth (Uses GoogleSignIn + Supabase ID Token exchange)
   static Future<AuthResponse?> signInWithGoogle({
     String? webClientId,
     String? iosClientId,
   }) async {
     final googleSignIn = GoogleSignIn(
-      serverClientId: webClientId,
+      serverClientId: webClientId ?? defaultWebClientId,
       clientId: iosClientId,
       scopes: ['email', 'profile'],
     );

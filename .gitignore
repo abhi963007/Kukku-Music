@@ -50,3 +50,7 @@ app.*.map.json
 keys.json
 *keys.json
 secrets.json
+*client_secret*.json
+client_secret*.json
+google-services.json
+GoogleService-Info.plist
