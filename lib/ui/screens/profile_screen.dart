@@ -29,6 +29,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   final DownloadViewController _downloads = Get.find<DownloadViewController>();
 
   @override
+  void initState() {
+    super.initState();
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
@@ -51,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (user != null && user.email != null) {
       return user.email!;
     }
-    return 'Guest User • Offline Mode';
+    return 'Guest User • Local Device Mode';
   }
 
   String _getAvatarUrl() {
@@ -72,19 +80,23 @@ class _ProfileScreenState extends State<ProfileScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Edit Profile Name", style: TextStyle(color: AppTheme.textPrimary, fontSize: 18)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Edit Profile Name",
+          style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         content: TextField(
           controller: textController,
           autofocus: true,
-          style: const TextStyle(color: AppTheme.textPrimary),
+          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
           decoration: InputDecoration(
             hintText: "Enter your name",
             hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
-            fillColor: AppTheme.surfaceLight,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            fillColor: const Color(0xFF2C2C2C),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
           ),
         ),
         actions: [
@@ -101,8 +113,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               }
               Navigator.of(ctx).pop();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.black),
-            child: const Text("Save"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -115,15 +131,18 @@ class _ProfileScreenState extends State<ProfileScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Change Profile Picture", style: TextStyle(color: AppTheme.textPrimary, fontSize: 18)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Change Profile Picture",
+          style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Enter an image URL for your profile avatar:",
+              "Enter a public image URL for your profile avatar:",
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -135,8 +154,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 hintText: "https://example.com/avatar.jpg",
                 hintStyle: const TextStyle(color: AppTheme.textMuted),
                 filled: true,
-                fillColor: AppTheme.surfaceLight,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: const Color(0xFF2C2C2C),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
               ),
             ),
           ],
@@ -157,8 +177,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {});
               Navigator.of(ctx).pop();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.black),
-            child: const Text("Save"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -171,11 +195,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     final name = _getUserName();
     final email = _getUserEmail();
     final isAuth = SupabaseService.isAuthenticated;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
@@ -209,275 +234,278 @@ class _ProfileScreenState extends State<ProfileScreen>
           }),
         ],
       ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-              child: Column(
-                children: [
-                  // 1. User Avatar & Info Card
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        // Avatar with Edit badge
-                        GestureDetector(
-                          onTap: _editAvatarDialog,
-                          child: Stack(
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: const LinearGradient(
-                                    colors: [AppTheme.primary, AppTheme.secondary],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.primary.withValues(alpha: 0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipOval(
-                                  child: avatar.isNotEmpty
-                                      ? CachedNetworkImage(
-                                          imageUrl: avatar,
-                                          fit: BoxFit.cover,
-                                          errorWidget: (_, _, _) => _avatarFallback(name),
-                                        )
-                                      : _avatarFallback(name),
-                                ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.camera_alt_rounded, size: 12, color: Colors.black),
-                                ),
-                              ),
-                            ],
-                          ),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+                child: Column(
+                  children: [
+                    // 1. VIP Profile Hero Card
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF242424),
+                            const Color(0xFF181818),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        // Name & Status
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Avatar with glowing border & edit pen
+                          GestureDetector(
+                            onTap: _editAvatarDialog,
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const LinearGradient(
+                                      colors: [AppTheme.primary, AppTheme.secondary],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primary.withValues(alpha: 0.35),
+                                        blurRadius: 14,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2.5),
+                                    child: ClipOval(
+                                      child: Container(
+                                        color: const Color(0xFF1A1A1A),
+                                        child: avatar.isNotEmpty
+                                            ? CachedNetworkImage(
+                                                imageUrl: avatar,
+                                                fit: BoxFit.cover,
+                                                errorWidget: (_, _, _) => _avatarFallback(name),
+                                              )
+                                            : _avatarFallback(name),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  GestureDetector(
-                                    onTap: _editNameDialog,
-                                    child: const Icon(Icons.edit_rounded, size: 16, color: AppTheme.primary),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                email,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 12.5,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              // Cloud Auth Badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isAuth
-                                      ? Colors.greenAccent.withValues(alpha: 0.15)
-                                      : AppTheme.surfaceLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isAuth
-                                        ? Colors.greenAccent.withValues(alpha: 0.3)
-                                        : Colors.white10,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isAuth ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-                                      size: 12,
-                                      color: isAuth ? Colors.greenAccent : AppTheme.textMuted,
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.primary,
+                                      shape: BoxShape.circle,
                                     ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      isAuth ? "Supabase Synced" : "Offline Guest",
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                    child: const Icon(Icons.camera_alt_rounded, size: 12, color: Colors.black),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          // Name, Email, Auth status
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: _editNameDialog,
+                                      child: const Icon(Icons.edit_rounded, size: 15, color: AppTheme.primary),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  email,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // Cloud status pill
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: isAuth
+                                        ? Colors.greenAccent.withValues(alpha: 0.12)
+                                        : Colors.white.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isAuth
+                                          ? Colors.greenAccent.withValues(alpha: 0.3)
+                                          : Colors.white.withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isAuth ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                                        size: 12,
                                         color: isAuth ? Colors.greenAccent : AppTheme.textMuted,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        isAuth ? "Supabase Cloud Synced" : "Guest Mode",
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: isAuth ? Colors.greenAccent : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Stats Row (Favorites, Playlists, History, Downloads)
-                  Obx(() {
-                    return Row(
-                      children: [
-                        _statPill("Favorites", _userData.favorites.length, Icons.favorite_rounded, Colors.redAccent, 0),
-                        const SizedBox(width: 8),
-                        _statPill("Playlists", _userData.playlists.length, Icons.playlist_play_rounded, AppTheme.primary, 1),
-                        const SizedBox(width: 8),
-                        _statPill("History", _userData.history.length, Icons.history_rounded, Colors.amberAccent, 2),
-                        const SizedBox(width: 8),
-                        _statPill("Downloads", _downloads.downloadedSongs.length, Icons.download_rounded, Colors.lightBlueAccent, 3),
-                      ],
-                    );
-                  }),
-                  const SizedBox(height: 16),
-
-                  // 3. Tab Bar
-                  Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        color: AppTheme.primary,
-                        borderRadius: BorderRadius.circular(12),
+                        ],
                       ),
-                      labelColor: Colors.black,
-                      unselectedLabelColor: AppTheme.textSecondary,
-                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: "Favorites"),
-                        Tab(text: "Playlists"),
-                        Tab(text: "History"),
-                        Tab(text: "Downloads"),
-                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+
+                    // 2. Stats Row (4 Glass Cards)
+                    Obx(() {
+                      return Row(
+                        children: [
+                          _statPill("Favorites", _userData.favorites.length, Icons.favorite_rounded, Colors.redAccent, 0),
+                          const SizedBox(width: 8),
+                          _statPill("Playlists", _userData.playlists.length, Icons.queue_music_rounded, AppTheme.primary, 1),
+                          const SizedBox(width: 8),
+                          _statPill("History", _userData.history.length, Icons.history_rounded, Colors.amberAccent, 2),
+                          const SizedBox(width: 8),
+                          _statPill("Downloads", _downloads.downloadedSongs.length, Icons.download_rounded, Colors.lightBlueAccent, 3),
+                        ],
+                      );
+                    }),
+                    const SizedBox(height: 16),
+
+                    // 3. Scrollable Premium Pill Tab Bar
+                    SizedBox(
+                      height: 40,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        padding: EdgeInsets.zero,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                        indicator: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        labelColor: Colors.black,
+                        unselectedLabelColor: AppTheme.textSecondary,
+                        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+                        dividerColor: Colors.transparent,
+                        tabs: const [
+                          Tab(text: "❤️ Favorites"),
+                          Tab(text: "📂 Playlists"),
+                          Tab(text: "🕒 History"),
+                          Tab(text: "📥 Downloads"),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // Tab 1: Favorites
-            _FavoritesTab(userData: _userData, player: _player),
-
-            // Tab 2: Custom Playlists
-            _PlaylistsTab(userData: _userData, player: _player),
-
-            // Tab 3: History
-            _HistoryTab(userData: _userData, player: _player),
-
-            // Tab 4: Downloads
-            _DownloadsTab(downloads: _downloads, player: _player),
           ],
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Favorites
+              _FavoritesTab(userData: _userData, player: _player, isAuth: isAuth, bottomInset: bottomInset),
+
+              // Tab 2: Custom Playlists
+              _PlaylistsTab(userData: _userData, player: _player, isAuth: isAuth, bottomInset: bottomInset),
+
+              // Tab 3: History
+              _HistoryTab(userData: _userData, player: _player, isAuth: isAuth, bottomInset: bottomInset),
+
+              // Tab 4: Downloads
+              _DownloadsTab(downloads: _downloads, player: _player, isAuth: isAuth, bottomInset: bottomInset),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: Container(
-        color: AppTheme.surface,
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        child: isAuth
-            ? OutlinedButton.icon(
-                onPressed: () async {
-                  await SupabaseService.signOut();
-                  setState(() {});
-                },
-                icon: const Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent),
-                label: const Text("Sign Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.redAccent),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              )
-            : ElevatedButton.icon(
-                onPressed: () => Get.to(() => const LoginScreen()),
-                icon: const Icon(Icons.login_rounded, size: 18),
-                label: const Text("Sign In with Supabase / Google", style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
       ),
     );
   }
 
   Widget _avatarFallback(String name) {
-    return Container(
-      color: AppTheme.surfaceLight,
-      child: Center(
-        child: Text(
-          name.isNotEmpty ? name[0].toUpperCase() : 'A',
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primary),
-        ),
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'A',
+        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.primary),
       ),
     );
   }
 
   Widget _statPill(String label, int count, IconData icon, Color color, int tabIndex) {
+    final isSelected = _tabController.index == tabIndex;
+
     return Expanded(
       child: GestureDetector(
         onTap: () => _tabController.animateTo(tabIndex),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: isSelected ? const Color(0xFF2A2A2A) : const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.cardBorder),
+            border: Border.all(
+              color: isSelected ? AppTheme.primary.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.06),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 18),
+              Icon(icon, color: color, size: 16),
               const SizedBox(height: 4),
               Text(
                 count.toString(),
@@ -508,27 +536,48 @@ class _ProfileScreenState extends State<ProfileScreen>
 class _FavoritesTab extends StatelessWidget {
   final UserDataController userData;
   final PlayerController player;
+  final bool isAuth;
+  final double bottomInset;
 
-  const _FavoritesTab({required this.userData, required this.player});
+  const _FavoritesTab({
+    required this.userData,
+    required this.player,
+    required this.isAuth,
+    required this.bottomInset,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final favs = userData.favorites;
       if (favs.isEmpty) {
-        return const Center(
-          child: StatePlaceholder(
-            icon: Icons.favorite_border_rounded,
-            title: "No Favorites Yet",
-            message: "Songs you favorite in the player will appear here.",
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 30),
+          child: Column(
+            children: [
+              const SizedBox(height: 30),
+              const StatePlaceholder(
+                icon: Icons.favorite_border_rounded,
+                title: "No Favorites Yet",
+                message: "Songs you favorite in the player will appear here automatically.",
+              ),
+              const SizedBox(height: 30),
+              _AuthActionCard(isAuth: isAuth),
+            ],
           ),
         );
       }
 
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 20),
-        itemCount: favs.length,
+        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
+        itemCount: favs.length + 1,
         itemBuilder: (context, index) {
+          if (index == favs.length) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+              child: _AuthActionCard(isAuth: isAuth),
+            );
+          }
           final song = favs[index];
           return SongTile(
             song: song,
@@ -546,26 +595,33 @@ class _FavoritesTab extends StatelessWidget {
 class _PlaylistsTab extends StatelessWidget {
   final UserDataController userData;
   final PlayerController player;
+  final bool isAuth;
+  final double bottomInset;
 
-  const _PlaylistsTab({required this.userData, required this.player});
+  const _PlaylistsTab({
+    required this.userData,
+    required this.player,
+    required this.isAuth,
+    required this.bottomInset,
+  });
 
   void _createPlaylistDialog(BuildContext context) {
     final textController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("New Playlist", style: TextStyle(color: AppTheme.textPrimary)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Create New Playlist", style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: textController,
           autofocus: true,
           style: const TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
-            hintText: "Playlist name",
+            hintText: "Playlist title",
             hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
-            fillColor: AppTheme.surfaceLight,
+            fillColor: const Color(0xFF2C2C2C),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
         ),
@@ -596,7 +652,7 @@ class _PlaylistsTab extends StatelessWidget {
       final playlists = userData.playlists;
 
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        padding: EdgeInsets.fromLTRB(18, 6, 18, bottomInset + 80),
         children: [
           // Create New Playlist Card
           InkWell(
@@ -605,7 +661,7 @@ class _PlaylistsTab extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppTheme.surface,
+                color: const Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
               ),
@@ -641,13 +697,16 @@ class _PlaylistsTab extends StatelessWidget {
 
           if (playlists.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(32),
+              padding: EdgeInsets.all(28),
               child: Center(
                 child: Text("No custom playlists created yet.", style: TextStyle(color: AppTheme.textMuted)),
               ),
             )
           else
             ...playlists.map((playlist) => _PlaylistCard(playlist: playlist)),
+
+          const SizedBox(height: 16),
+          _AuthActionCard(isAuth: isAuth),
         ],
       );
     });
@@ -664,27 +723,27 @@ class _PlaylistCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.cardBorder),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: ListTile(
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: SizedBox(
-            width: 50,
-            height: 50,
+            width: 48,
+            height: 48,
             child: playlist.coverArt.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: playlist.coverArt,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => const ColoredBox(
-                      color: AppTheme.surfaceLight,
+                      color: Color(0xFF282828),
                       child: Icon(Icons.playlist_play_rounded, color: AppTheme.primary),
                     ),
                   )
                 : const ColoredBox(
-                    color: AppTheme.surfaceLight,
+                    color: Color(0xFF282828),
                     child: Icon(Icons.playlist_play_rounded, color: AppTheme.primary),
                   ),
           ),
@@ -697,7 +756,7 @@ class _PlaylistCard extends StatelessWidget {
           "${playlist.songs.length} tracks",
           style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textMuted),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppTheme.textMuted),
         onTap: () => Get.to(() => PlaylistDetailScreen(playlistId: playlist.id)),
       ),
     );
@@ -710,27 +769,48 @@ class _PlaylistCard extends StatelessWidget {
 class _HistoryTab extends StatelessWidget {
   final UserDataController userData;
   final PlayerController player;
+  final bool isAuth;
+  final double bottomInset;
 
-  const _HistoryTab({required this.userData, required this.player});
+  const _HistoryTab({
+    required this.userData,
+    required this.player,
+    required this.isAuth,
+    required this.bottomInset,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final history = userData.history;
       if (history.isEmpty) {
-        return const Center(
-          child: StatePlaceholder(
-            icon: Icons.history_rounded,
-            title: "No Listening History",
-            message: "Songs you stream will appear here in chronological order.",
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 30),
+          child: Column(
+            children: [
+              const SizedBox(height: 30),
+              const StatePlaceholder(
+                icon: Icons.history_rounded,
+                title: "No Listening History",
+                message: "Songs you stream will appear here in chronological order.",
+              ),
+              const SizedBox(height: 30),
+              _AuthActionCard(isAuth: isAuth),
+            ],
           ),
         );
       }
 
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 20),
-        itemCount: history.length,
+        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
+        itemCount: history.length + 1,
         itemBuilder: (context, index) {
+          if (index == history.length) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+              child: _AuthActionCard(isAuth: isAuth),
+            );
+          }
           final song = history[index];
           return SongTile(
             song: song,
@@ -748,27 +828,48 @@ class _HistoryTab extends StatelessWidget {
 class _DownloadsTab extends StatelessWidget {
   final DownloadViewController downloads;
   final PlayerController player;
+  final bool isAuth;
+  final double bottomInset;
 
-  const _DownloadsTab({required this.downloads, required this.player});
+  const _DownloadsTab({
+    required this.downloads,
+    required this.player,
+    required this.isAuth,
+    required this.bottomInset,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final items = downloads.downloadedSongs;
       if (items.isEmpty) {
-        return const Center(
-          child: StatePlaceholder(
-            icon: Icons.download_done_rounded,
-            title: "No Downloaded Music",
-            message: "Save songs offline for high quality playback without internet.",
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 30),
+          child: Column(
+            children: [
+              const SizedBox(height: 30),
+              const StatePlaceholder(
+                icon: Icons.download_done_rounded,
+                title: "No Downloaded Music",
+                message: "Save songs offline for high quality playback without internet.",
+              ),
+              const SizedBox(height: 30),
+              _AuthActionCard(isAuth: isAuth),
+            ],
           ),
         );
       }
 
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 20),
-        itemCount: items.length,
+        padding: EdgeInsets.fromLTRB(0, 6, 0, bottomInset + 80),
+        itemCount: items.length + 1,
         itemBuilder: (context, index) {
+          if (index == items.length) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+              child: _AuthActionCard(isAuth: isAuth),
+            );
+          }
           final song = items[index];
           return SongTile(
             song: song,
@@ -777,5 +878,87 @@ class _DownloadsTab extends StatelessWidget {
         },
       );
     });
+  }
+}
+
+// ----------------------------------------------------
+// AUTH & ACCOUNT ACTION CARD (Placed cleanly inside scroll)
+// ----------------------------------------------------
+class _AuthActionCard extends StatelessWidget {
+  final bool isAuth;
+
+  const _AuthActionCard({required this.isAuth});
+
+  @override
+  Widget build(BuildContext context) {
+    if (isAuth) {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            await SupabaseService.signOut();
+            Get.back();
+          },
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.logout_rounded, color: Colors.redAccent, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  "Sign Out from Supabase",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppTheme.primary, AppTheme.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Get.to(() => const LoginScreen()),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.login_rounded, color: Colors.black, size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Sign In / Sync Cloud Account",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
