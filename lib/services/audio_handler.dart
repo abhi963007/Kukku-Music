@@ -7,14 +7,12 @@ import 'dart:ui' show Color;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:get/get.dart' as getx;
 import 'package:just_audio/just_audio.dart';
 
 import '../models/audio.dart';
 import '../models/song_model.dart';
 import '../models/streaming_data.dart';
 import '../utils/helper.dart';
-import 'groq_ai_service.dart';
 import 'saavn_service.dart';
 import 'storage_paths.dart';
 import 'stream_service.dart';
@@ -805,47 +803,38 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       final currentQueue = List<MediaItem>.from(queue.value);
       final recent = boxGet<List<dynamic>>('AppPrefs', 'recentSongs', const []);
       final excludeTitles = <String>{
-        ...currentQueue.map((e) => e.title),
-        ...recent.map((e) => asText(asStringMap(e)['title'])),
-      }.where((title) => title.trim().isNotEmpty).toList();
+        ...currentQueue.map((e) => e.title.toLowerCase().trim()),
+        ...recent.map((e) => asText(asStringMap(e)['title']).toLowerCase().trim()),
+      }.where((title) => title.isNotEmpty).toSet();
+
       List<SongModel> recommendedSongs = [];
 
-      // 1. Groq AI context-aware radio recommendations (fresh trending priority)
-      if (getx.Get.isRegistered<GroqAiService>() && seedTitle.isNotEmpty) {
-        try {
-          final aiService = getx.Get.find<GroqAiService>();
-          recommendedSongs = await aiService.getSmartRadioRecommendations(
-            currentTitle: seedTitle,
-            currentArtist: seedArtist,
-            currentAlbum: seedAlbum,
-            currentLanguage: seedLanguage,
-            excludeTitles: excludeTitles,
-          );
-        } catch (e) {
-          printERROR('Groq AI radio replenishment failed', e);
-        }
-      }
-
-      // 2. Saavn related tracks fallback
-      if (recommendedSongs.isEmpty &&
-          seedTitle.isNotEmpty &&
-          seedLanguage.isNotEmpty) {
+      // JioSaavn native related tracks and station recommendations
+      if (seedTitle.isNotEmpty) {
         final related = await SaavnService.getRelatedSongs(
           seedTitle,
           seedArtist,
           seedAlbum,
         );
-        // Related/radio endpoints can cross regional catalogues, so use them
-        // only as a language-verified fallback. Mood continuity is otherwise
-        // owned by the Groq recommendation profile above.
-        recommendedSongs = related
-            .where(
-              (song) => SaavnService.isExactLanguageMatch(
-                asText(song.extras['language']),
-                seedLanguage,
-              ),
-            )
+
+        final filtered = related
+            .where((song) => !excludeTitles.contains(song.title.toLowerCase().trim()))
             .toList();
+
+        if (seedLanguage.isNotEmpty) {
+          recommendedSongs = filtered
+              .where(
+                (song) => SaavnService.isExactLanguageMatch(
+                  asText(song.extras['language']),
+                  seedLanguage,
+                ),
+              )
+              .toList();
+        }
+
+        if (recommendedSongs.isEmpty) {
+          recommendedSongs = filtered.isNotEmpty ? filtered : related;
+        }
       }
 
       if (recommendedSongs.isNotEmpty) {

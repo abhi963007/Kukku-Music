@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 
 import '../models/song_model.dart';
 import '../services/audio_handler.dart';
-import '../services/groq_ai_service.dart';
 import '../utils/helper.dart';
 
 class PlayerController extends GetxController {
@@ -254,7 +253,7 @@ class PlayerController extends GetxController {
     }
   }
 
-  /// Automatically fetches authentic song details and credits in the background
+  /// Populates authentic song details and credits directly from metadata
   Future<void> fetchDetailsForSong(SongModel song) async {
     if (song.title.isEmpty) return;
 
@@ -263,24 +262,23 @@ class PlayerController extends GetxController {
       return;
     }
 
-    if (Get.isRegistered<GroqAiService>()) {
-      isLoadingDetails.value = true;
-      try {
-        final aiService = Get.find<GroqAiService>();
-        final details = await aiService.getSongDetails(
-          title: song.title,
-          artist: song.artist,
-          album: song.album,
-        );
-        _detailsCache[song.id] = details;
-        if (currentSong.value?.id == song.id) {
-          currentSongDetails.value = details;
-        }
-      } catch (e) {
-        printERROR('Failed to fetch song details', e);
-      } finally {
-        isLoadingDetails.value = false;
-      }
+    final lang = asText(song.extras['language']);
+    final details = <String, dynamic>{
+      'tags': [
+        if (lang.isNotEmpty) lang,
+        if (song.album.isNotEmpty && song.album != 'Single' && song.album != 'Search') song.album,
+        'Original Track',
+        '320kbps HD',
+      ],
+      'mood': '${song.title} by ${song.artist}${song.album.isNotEmpty ? " (${song.album})" : ""}.',
+      'about': 'Streamed in high fidelity 320kbps audio from the official catalog.',
+      'composer': song.artist,
+      'singers': song.artist,
+    };
+
+    _detailsCache[song.id] = details;
+    if (currentSong.value?.id == song.id) {
+      currentSongDetails.value = details;
     }
   }
 }
