@@ -446,12 +446,27 @@ class MusicServices extends getx.GetxService {
       final melodies = results[4] as List<SongModel>;
       final dailyMix = results.length > 5 ? results[5] as List<SongModel> : <SongModel>[];
 
-      // Merge AI movie tracks with general trending (deduplicating by ID)
+      final isTrending = language.toLowerCase() == 'trending';
+
+      bool isAllowedLanguage(SongModel s) {
+        if (isTrending) return true; // Trending tab allows all languages
+        final songLang = asText(s.extras['language']).toLowerCase().trim();
+        if (songLang.isEmpty) return true;
+        return SaavnService.isExactLanguageMatch(songLang, language);
+      }
+
+      bool isAllowedAlbum(AlbumModel a) {
+        if (isTrending) return true;
+        if (a.language.isEmpty) return true;
+        return SaavnService.isExactLanguageMatch(a.language, language);
+      }
+
+      // Merge AI movie tracks with general trending (deduplicating by ID and strictly enforcing language)
       final Set<String> seenIds = {};
       final List<SongModel> mergedTrending = [];
 
       for (final s in [...aiMovieSongs, ...generalTrending]) {
-        if (s.id.isNotEmpty && !seenIds.contains(s.id)) {
+        if (s.id.isNotEmpty && !seenIds.contains(s.id) && isAllowedLanguage(s)) {
           seenIds.add(s.id);
           mergedTrending.add(s);
         }
@@ -459,23 +474,27 @@ class MusicServices extends getx.GetxService {
 
       final List<SongModel> mergedMovieHits = [];
       for (final s in [...movieHits, ...aiMovieSongs]) {
-        if (s.id.isNotEmpty && !seenIds.contains(s.id)) {
+        if (s.id.isNotEmpty && !seenIds.contains(s.id) && isAllowedLanguage(s)) {
           seenIds.add(s.id);
           mergedMovieHits.add(s);
         }
       }
 
+      final filteredMelodies = melodies.where(isAllowedLanguage).toList();
+      final filteredDailyMix = dailyMix.where(isAllowedLanguage).toList();
+      final filteredAlbums = albums.where(isAllowedAlbum).toList();
+
       final data = LanguageHomeData(
         language: language,
         trending: mergedTrending.isNotEmpty ? mergedTrending : await searchTracks(queries.trendingQuery),
-        albums: albums,
+        albums: filteredAlbums,
         movieHits: mergedMovieHits.isNotEmpty ? mergedMovieHits : movieHits,
-        topPicks: melodies.isNotEmpty ? melodies : (mergedTrending.isNotEmpty ? mergedTrending : []),
-        dailyMix: dailyMix,
+        topPicks: filteredMelodies.isNotEmpty ? filteredMelodies : (mergedTrending.isNotEmpty ? mergedTrending : []),
+        dailyMix: filteredDailyMix,
         artists: queries.popularArtists,
       );
 
-      if (mergedTrending.isNotEmpty || albums.isNotEmpty) {
+      if (mergedTrending.isNotEmpty || filteredAlbums.isNotEmpty) {
         _languageCache[language] = data;
         _languageCacheStamp[language] = DateTime.now();
       }
