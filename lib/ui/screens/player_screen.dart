@@ -1,7 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/player_controller.dart';
@@ -354,63 +353,15 @@ class _ActionPillsRow extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          // 1. Like / Dislike Segmented Pill
+          // 1. Fav (Favorite) Pill
           Obx(() {
             final isFav = userData.isFavorite(song.id);
-            return Container(
-              height: 38,
-              decoration: BoxDecoration(
-                color: const Color(0xFF282828),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
-                    onTap: () => userData.toggleFavorite(song),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isFav ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
-                            size: 18,
-                            color: isFav ? AppTheme.primary : Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isFav ? "Liked" : "Like",
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: isFav ? AppTheme.primary : Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Container(width: 1, height: 18, color: Colors.white12),
-                  InkWell(
-                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(20)),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Get.rawSnackbar(
-                        message: "We'll tune your recommendations",
-                        duration: const Duration(seconds: 2),
-                        margin: const EdgeInsets.all(16),
-                        borderRadius: 12,
-                        backgroundColor: AppTheme.surface,
-                      );
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(Icons.thumb_down_alt_outlined, size: 18, color: Colors.white70),
-                    ),
-                  ),
-                ],
-              ),
+            return _ActionPill(
+              icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              iconColor: isFav ? Colors.redAccent : Colors.white,
+              label: isFav ? "Favorited" : "Fav",
+              textColor: isFav ? Colors.redAccent : Colors.white,
+              onTap: () => userData.toggleFavorite(song),
             );
           }),
 
@@ -450,11 +401,15 @@ class _ActionPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? textColor;
 
   const _ActionPill({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.iconColor,
+    this.textColor,
   });
 
   @override
@@ -472,14 +427,14 @@ class _ActionPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: Colors.white),
+            Icon(icon, size: 18, color: iconColor ?? Colors.white),
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: textColor ?? Colors.white,
               ),
             ),
           ],

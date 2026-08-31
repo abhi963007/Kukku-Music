@@ -94,11 +94,11 @@ class YtTrackOptionsSheet extends StatelessWidget {
                   final isFav = userData.isFavorite(song.id);
                   return IconButton(
                     icon: Icon(
-                      isFav ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
-                      color: isFav ? AppTheme.primary : AppTheme.textSecondary,
+                      isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: isFav ? Colors.redAccent : AppTheme.textSecondary,
                       size: 22,
                     ),
-                    tooltip: isFav ? 'Liked' : 'Like',
+                    tooltip: isFav ? 'Favorited' : 'Add to Fav',
                     onPressed: () => userData.toggleFavorite(song),
                   );
                 }),
