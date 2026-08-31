@@ -126,70 +126,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  void _editAvatarDialog() {
-    final textController = TextEditingController(text: _getAvatarUrl());
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          "Change Profile Picture",
-          style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Enter a public image URL for your profile avatar:",
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: "https://example.com/avatar.jpg",
-                hintStyle: const TextStyle(color: AppTheme.textMuted),
-                filled: true,
-                fillColor: const Color(0xFF2C2C2C),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              boxPut('AppPrefs', 'user_custom_avatar', '');
-              setState(() {});
-              Navigator.of(ctx).pop();
-            },
-            child: const Text("Reset Default", style: TextStyle(color: Colors.redAccent)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newUrl = textController.text.trim();
-              boxPut('AppPrefs', 'user_custom_avatar', newUrl);
-              setState(() {});
-              Navigator.of(ctx).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final avatar = _getAvatarUrl();
@@ -269,58 +205,39 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       child: Row(
                         children: [
-                          // Avatar with glowing border & edit pen
-                          GestureDetector(
-                            onTap: _editAvatarDialog,
-                            child: Stack(
-                              children: [
-                                Container(
-                                  width: 68,
-                                  height: 68,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: const LinearGradient(
-                                      colors: [AppTheme.primary, AppTheme.secondary],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.primary.withValues(alpha: 0.35),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(2.5),
-                                    child: ClipOval(
-                                      child: Container(
-                                        color: const Color(0xFF1A1A1A),
-                                        child: avatar.isNotEmpty
-                                            ? CachedNetworkImage(
-                                                imageUrl: avatar,
-                                                fit: BoxFit.cover,
-                                                errorWidget: (_, _, _) => _avatarFallback(name),
-                                              )
-                                            : _avatarFallback(name),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4.5),
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.camera_alt_rounded, size: 11, color: Colors.black),
-                                  ),
+                          // Clean Avatar with glowing gradient ring (no camera badge)
+                          Container(
+                            width: 68,
+                            height: 68,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [AppTheme.primary, AppTheme.secondary],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primary.withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2.5),
+                              child: ClipOval(
+                                child: Container(
+                                  color: const Color(0xFF1A1A1A),
+                                  child: avatar.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: avatar,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, _, _) => _avatarFallback(name),
+                                        )
+                                      : _avatarFallback(name),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 15),
