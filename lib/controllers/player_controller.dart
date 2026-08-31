@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import '../models/song_model.dart';
 import '../services/audio_handler.dart';
 import '../utils/helper.dart';
+import 'user_data_controller.dart';
 
 class PlayerController extends GetxController {
   final MyAudioHandler audioHandler;
@@ -73,10 +74,13 @@ class PlayerController extends GetxController {
 
       audioBadge.value = _badgeFor(item);
 
-      // Recents and song details are updated on track change
+      // Recents, history tracking and song details are updated on track change
       if (previousId != item.id) {
         loadRecentSongs();
         fetchDetailsForSong(currentSong.value!);
+        if (Get.isRegistered<UserDataController>()) {
+          Get.find<UserDataController>().recordPlay(currentSong.value!);
+        }
       }
     }, onError: (Object e) => printERROR('mediaItem stream error', e)));
 

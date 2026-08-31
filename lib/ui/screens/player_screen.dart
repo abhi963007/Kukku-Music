@@ -5,8 +5,10 @@ import 'package:get/get.dart';
 
 import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/add_to_playlist_sheet.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/palette_background.dart';
 import '../widgets/progress_slider.dart';
@@ -304,29 +306,58 @@ class _TrackMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final userData = Get.find<UserDataController>();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Long titles scroll instead of being truncated.
-        ScrollingText(
-          text: song.title,
-          height: 28,
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Long titles scroll instead of being truncated.
+              ScrollingText(
+                text: song.title,
+                height: 28,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              ScrollingText(
+                text: song.artist,
+                height: 22,
+                velocity: 22,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 2),
-        ScrollingText(
-          text: song.artist,
-          height: 22,
-          velocity: 22,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        const SizedBox(width: 8),
+        Obx(() {
+          final isFav = userData.isFavorite(song.id);
+          return IconButton(
+            iconSize: 28,
+            splashRadius: 24,
+            tooltip: isFav ? 'Remove from favorites' : 'Add to favorites',
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+              child: Icon(
+                isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                key: ValueKey<bool>(isFav),
+                color: isFav ? Colors.redAccent : AppTheme.textMuted,
+              ),
+            ),
+            onPressed: () => userData.toggleFavorite(song),
+          );
+        }),
       ],
     );
   }
@@ -520,7 +551,30 @@ class _BottomActions extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           downloadWidget,
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            onTap: () => AddToPlaylistSheet.show(context, song),
+            child: _pill(
+              background: AppTheme.surfaceLight.withValues(alpha: 0.6),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.playlist_add_rounded, color: AppTheme.textSecondary, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Playlist',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           InkWell(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             onTap: () => SongDetailsSheet.show(context, song),
@@ -530,7 +584,7 @@ class _BottomActions extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary, size: 16),
-                  SizedBox(width: 6),
+                  SizedBox(width: 4),
                   Text(
                     'Details',
                     style: TextStyle(

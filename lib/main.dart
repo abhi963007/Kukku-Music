@@ -12,6 +12,7 @@ import 'controllers/download_controller.dart';
 import 'controllers/player_controller.dart';
 import 'controllers/search_controller.dart';
 import 'controllers/settings_controller.dart';
+import 'controllers/user_data_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/downloader.dart';
 import 'services/music_service.dart';
@@ -26,6 +27,7 @@ const List<String> _hiveBoxes = [
   'SongsUrlCache',
   'SongsCache',
   'SongDownloads',
+  'UserPersonalData',
 ];
 
 void main() {
@@ -61,6 +63,7 @@ void main() {
 
     // Register GetX global services and controllers
     Get.put<AuthController>(AuthController(), permanent: true);
+    Get.put<UserDataController>(UserDataController(), permanent: true);
     Get.put<MyAudioHandler>(myAudioHandler, permanent: true);
     Get.put<MusicServices>(MusicServices(), permanent: true);
     Get.put<DownloaderService>(DownloaderService(), permanent: true);
