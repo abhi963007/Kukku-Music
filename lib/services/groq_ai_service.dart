@@ -215,6 +215,7 @@ Output strictly in JSON format without markdown code blocks:
     required String currentTitle,
     required String currentArtist,
     String currentAlbum = '',
+    String currentLanguage = '',
     List<String> excludeTitles = const [],
   }) async {
     const systemPrompt = '''
@@ -222,16 +223,20 @@ You are an intelligent music streaming algorithm (like Spotify Radio / YouTube M
 Recommend 10 modern, trending, and fresh hit songs that seamlessly match the exact emotion, vibe, tempo, and language of the currently playing song.
 
 STRICT REQUIREMENTS:
-1. STRICT SAME LANGUAGE: All recommendations MUST be in the EXACT SAME LANGUAGE as the currently playing track.
+1. FIRST ANALYSE THE SEED: determine its exact `emotion` (Sad, Melancholy, Romantic, Party, or Relaxing), `tempo` (Slow, Mid, or Fast), and exact `language`.
+2. STRICT SAME LANGUAGE: All recommendations MUST be in the EXACT SAME LANGUAGE as the currently playing track.
    - If the current song is Malayalam -> ALL 10 recommendations MUST be popular Malayalam songs.
    - If the current song is Tamil -> ALL 10 recommendations MUST be popular Tamil songs.
    - If the current song is Hindi -> ALL 10 recommendations MUST be popular Hindi songs.
    - NEVER mix languages.
-2. DIVERSE SONG TITLES: Recommend DIFFERENT songs. DO NOT recommend covers, remixes, or karaoke of the currently playing track.
-3. TRENDING & MODERN: Prioritize recent, popular, and trending contemporary hit songs.
-4. DO NOT repeat any excluded songs.
-5. Output strictly in JSON format without markdown code blocks:
+3. MOOD AND TEMPO LOCK: Every result must preserve the seed's emotional feeling, genre family, and tempo. Sad/melancholy songs must only produce sad/melancholy songs; party/dance songs must only produce party/dance songs.
+4. DIVERSE SONG TITLES: Recommend DIFFERENT songs. DO NOT recommend covers, remixes, or karaoke of the currently playing track.
+5. TRENDING & MODERN: Prioritize recent, popular, and trending contemporary hit songs.
+6. DO NOT repeat any excluded songs.
+7. Output strictly in JSON format without markdown code blocks:
 {
+  "emotion": "Sad | Melancholy | Romantic | Party | Relaxing",
+  "tempo": "Slow | Mid | Fast",
   "language": "Detected Language",
   "recommendations": [
     {"title": "Song Title", "artist": "Primary Singer", "movie": "Movie / Album Name"}
@@ -242,8 +247,9 @@ STRICT REQUIREMENTS:
     final excludeStr = excludeTitles.take(20).join(', ');
     final userPrompt =
         'Currently playing: "$currentTitle" by "$currentArtist" (Album/Movie: "$currentAlbum").'
+        '${currentLanguage.isNotEmpty ? ' Its catalogue language is "$currentLanguage"; preserve it exactly.' : ''}'
         '${excludeStr.isNotEmpty ? ' Exclude these songs: [$excludeStr].' : ''}'
-        ' Recommend 10 fresh, trending songs in the EXACT SAME language.';
+        ' Recommend 10 fresh, trending songs in the EXACT SAME language, mood, genre, and tempo.';
 
     final json = await _callGroqJson(
       systemPrompt: systemPrompt,
@@ -252,7 +258,7 @@ STRICT REQUIREMENTS:
     );
 
     final rawList = json?['recommendations'] as List? ?? [];
-    final lang = asText(json?['language']);
+    final lang = currentLanguage.isNotEmpty ? currentLanguage : asText(json?['language']);
     final List<SongModel> resolved = [];
     final lowerExcludes = excludeTitles.map((e) => e.toLowerCase().trim()).toSet();
     lowerExcludes.add(currentTitle.toLowerCase().trim());
@@ -260,27 +266,33 @@ STRICT REQUIREMENTS:
     for (final item in rawList) {
       final map = asStringMap(item);
       final title = asText(map['title']);
-      final artist = asText(map['artist']);
       final movie = asText(map['movie']);
       if (title.isEmpty) continue;
 
       if (lowerExcludes.contains(title.toLowerCase().trim())) continue;
 
-      // Build specific search query including movie or language
-      String q;
+      // A movie title is the strongest disambiguator.  Without one, language
+      // is mandatory: searching only by artist can select a Hindi/Tamil song
+      // with the same romanised title.
+      if (lang.isEmpty) continue;
+      final String q;
       if (movie.isNotEmpty && movie != 'Single') {
         q = '$title $movie';
-      } else if (artist.isNotEmpty && artist != 'Unknown') {
-        q = '$title $artist';
-      } else if (lang.isNotEmpty) {
-        q = '$title $lang';
       } else {
-        q = title;
+        q = '$title $lang';
       }
 
-      final found = await SaavnService.searchSongs(q, limit: 1);
-      if (found.isNotEmpty) {
-        final song = found.first;
+      final found = await SaavnService.searchSongs(q, limit: 8);
+      final song = found.cast<SongModel?>().firstWhere(
+            (candidate) =>
+                candidate != null &&
+                SaavnService.isExactLanguageMatch(
+                  asText(candidate.extras['language']),
+                  lang,
+                ),
+            orElse: () => null,
+          );
+      if (song != null) {
         final songTitleLower = song.title.toLowerCase().trim();
         if (!lowerExcludes.contains(songTitleLower)) {
           resolved.add(song);

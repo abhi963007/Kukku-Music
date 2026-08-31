@@ -13,7 +13,9 @@ class AppTheme {
   static const Color textSecondary = Color(0xFFB3B3B3); // Light grey (4.5:1 on #111)
   static const Color textMuted     = Color(0xFF8A8A8A); // Dim grey (3:1 on #111)
   static const Color success       = Color(0xFFFFFFFF); // White for success
+  static const Color warning       = Color(0xFFFFB74D); // Setup attention state
   static const Color danger        = Color(0xFFFF6B6B); // Destructive actions
+  static const Color error         = danger;
   static const Color cardBorder    = Color(0x22FFFFFF); // Subtle white border
 
   /// Minimum tappable edge length, per Material accessibility guidance.

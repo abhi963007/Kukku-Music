@@ -15,7 +15,6 @@ import '../models/song_model.dart';
 import '../models/streaming_data.dart';
 import '../utils/helper.dart';
 import 'groq_ai_service.dart';
-import 'music_service.dart';
 import 'saavn_service.dart';
 import 'storage_paths.dart';
 import 'stream_service.dart';
@@ -127,110 +126,121 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   void _listenForInterruptions(AudioSession session) {
     // Another app (call, navigation prompt, other player) grabbed audio focus.
-    _subscriptions.add(session.interruptionEventStream.listen((event) async {
-      if (event.begin) {
-        switch (event.type) {
-          case AudioInterruptionType.duck:
-            // Transient, allow-ducking: drop volume instead of pausing.
-            await _player.setVolume(0.3);
-            break;
-          case AudioInterruptionType.pause:
-          case AudioInterruptionType.unknown:
-            if (_player.playing) {
-              _pausedByInterruption = true;
-              await _player.pause();
-            }
-            break;
-        }
-      } else {
-        switch (event.type) {
-          case AudioInterruptionType.duck:
-            await _player.setVolume(1.0);
-            break;
-          case AudioInterruptionType.pause:
-            if (_pausedByInterruption) {
+    _subscriptions.add(
+      session.interruptionEventStream.listen((event) async {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // Transient, allow-ducking: drop volume instead of pausing.
+              await _player.setVolume(0.3);
+              break;
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              if (_player.playing) {
+                _pausedByInterruption = true;
+                await _player.pause();
+              }
+              break;
+          }
+        } else {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              await _player.setVolume(1.0);
+              break;
+            case AudioInterruptionType.pause:
+              if (_pausedByInterruption) {
+                _pausedByInterruption = false;
+                await _player.play();
+              }
+              break;
+            case AudioInterruptionType.unknown:
+              // Focus was permanently lost — stay paused.
               _pausedByInterruption = false;
-              await _player.play();
-            }
-            break;
-          case AudioInterruptionType.unknown:
-            // Focus was permanently lost — stay paused.
-            _pausedByInterruption = false;
-            break;
+              break;
+          }
         }
-      }
-    }, onError: (Object e) => printERROR('Interruption stream error', e)));
+      }, onError: (Object e) => printERROR('Interruption stream error', e)),
+    );
 
     // Headphones unplugged / bluetooth disconnected: pause, never blast audio
     // out of the phone speaker.
-    _subscriptions.add(session.becomingNoisyEventStream.listen((_) {
-      printINFO('Audio became noisy — pausing playback');
-      _pausedByInterruption = false;
-      _player.pause();
-    }, onError: (Object e) => printERROR('Becoming-noisy stream error', e)));
+    _subscriptions.add(
+      session.becomingNoisyEventStream.listen((_) {
+        printINFO('Audio became noisy — pausing playback');
+        _pausedByInterruption = false;
+        _player.pause();
+      }, onError: (Object e) => printERROR('Becoming-noisy stream error', e)),
+    );
   }
 
   // ── Broadcast playback state to AudioService ─────────────────────────────
 
-  static const Map<ProcessingState, AudioProcessingState> _processingStateMap = {
-    ProcessingState.idle: AudioProcessingState.idle,
-    ProcessingState.loading: AudioProcessingState.loading,
-    ProcessingState.buffering: AudioProcessingState.buffering,
-    ProcessingState.ready: AudioProcessingState.ready,
-    ProcessingState.completed: AudioProcessingState.completed,
-  };
+  static const Map<ProcessingState, AudioProcessingState> _processingStateMap =
+      {
+        ProcessingState.idle: AudioProcessingState.idle,
+        ProcessingState.loading: AudioProcessingState.loading,
+        ProcessingState.buffering: AudioProcessingState.buffering,
+        ProcessingState.ready: AudioProcessingState.ready,
+        ProcessingState.completed: AudioProcessingState.completed,
+      };
 
   void _publishState() {
     if (_disposed) return;
     final playing = _player.playing;
-    playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (playing) MediaControl.pause else MediaControl.play,
-        MediaControl.skipToNext,
-        MediaControl.stop,
-      ],
-      // Exposing these lets the system UI, Android Auto and wearables drive
-      // seeking and shuffle/repeat, which previously did nothing.
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-        MediaAction.playPause,
-        MediaAction.skipToNext,
-        MediaAction.skipToPrevious,
-        MediaAction.setRepeatMode,
-        MediaAction.setShuffleMode,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
-      processingState: isSongLoading
-          ? AudioProcessingState.loading
-          : (_processingStateMap[_player.processingState] ?? AudioProcessingState.idle),
-      playing: playing,
-      updatePosition: _player.position,
-      bufferedPosition: _player.bufferedPosition,
-      speed: _player.speed,
-      queueIndex: _currentIndex,
-      repeatMode: _repeatMode,
-      shuffleMode:
-          _shuffleEnabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
-    ));
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: [
+          MediaControl.skipToPrevious,
+          if (playing) MediaControl.pause else MediaControl.play,
+          MediaControl.skipToNext,
+          MediaControl.stop,
+        ],
+        // Exposing these lets the system UI, Android Auto and wearables drive
+        // seeking and shuffle/repeat, which previously did nothing.
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+          MediaAction.playPause,
+          MediaAction.skipToNext,
+          MediaAction.skipToPrevious,
+          MediaAction.setRepeatMode,
+          MediaAction.setShuffleMode,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: isSongLoading
+            ? AudioProcessingState.loading
+            : (_processingStateMap[_player.processingState] ??
+                  AudioProcessingState.idle),
+        playing: playing,
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+        speed: _player.speed,
+        queueIndex: _currentIndex,
+        repeatMode: _repeatMode,
+        shuffleMode: _shuffleEnabled
+            ? AudioServiceShuffleMode.all
+            : AudioServiceShuffleMode.none,
+      ),
+    );
   }
 
   void _notifyPlaybackEvents() {
-    _subscriptions.add(_player.playbackEventStream.listen(
-      (PlaybackEvent event) => _publishState(),
-      onError: (Object e, StackTrace st) async {
-        if (e is PlayerException) {
-          printERROR('PlayerException code=${e.code}: ${e.message}');
-          // A dead CDN link is the common case: re-resolve and resume in place.
-          await _retryCurrentWithFreshUrl();
-        } else {
-          printERROR('Playback stream error, retrying with fresh URL', e);
-          await _retryCurrentWithFreshUrl();
-        }
-      },
-    ));
+    _subscriptions.add(
+      _player.playbackEventStream.listen(
+        (PlaybackEvent event) => _publishState(),
+        onError: (Object e, StackTrace st) async {
+          if (e is PlayerException) {
+            printERROR('PlayerException code=${e.code}: ${e.message}');
+            // A dead CDN link is the common case: re-resolve and resume in place.
+            await _retryCurrentWithFreshUrl();
+          } else {
+            printERROR('Playback stream error, retrying with fresh URL', e);
+            await _retryCurrentWithFreshUrl();
+          }
+        },
+      ),
+    );
   }
 
   /// Re-resolves the current track's URL and resumes from the same position.
@@ -254,10 +264,12 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       _retryCount = 0;
     }
     if (_retryCount >= _maxRetriesPerTrack) {
-      playbackState.add(playbackState.value.copyWith(
-        processingState: AudioProcessingState.error,
-        errorMessage: 'Could not play "${q[_currentIndex].title}". Skipping.',
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          errorMessage: 'Could not play "${q[_currentIndex].title}". Skipping.',
+        ),
+      );
       // Move on instead of stalling on a track that cannot be resolved.
       await skipToNext();
       return;
@@ -274,40 +286,48 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       }
     } catch (e) {
       printERROR('Retry with fresh URL failed', e);
-      playbackState.add(playbackState.value.copyWith(
-        processingState: AudioProcessingState.error,
-        errorMessage: 'Playback failed. Tap another track to continue.',
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          errorMessage: 'Playback failed. Tap another track to continue.',
+        ),
+      );
     } finally {
       _retrying = false;
     }
   }
 
   void _listenForDurationChanges() {
-    _subscriptions.add(_player.durationStream.listen((duration) {
-      final current = mediaItem.value;
-      if (current != null &&
-          duration != null &&
-          duration > Duration.zero &&
-          current.duration != duration) {
-        mediaItem.add(current.copyWith(duration: duration));
-      }
-    }));
+    _subscriptions.add(
+      _player.durationStream.listen((duration) {
+        final current = mediaItem.value;
+        if (current != null &&
+            duration != null &&
+            duration > Duration.zero &&
+            current.duration != duration) {
+          mediaItem.add(current.copyWith(duration: duration));
+        }
+      }),
+    );
   }
 
   void _listenForCompletion() {
-    _subscriptions.add(_player.processingStateStream.listen((state) {
-      if (state != ProcessingState.completed || _isTransitioning || _disposed) return;
+    _subscriptions.add(
+      _player.processingStateStream.listen((state) {
+        if (state != ProcessingState.completed || _isTransitioning || _disposed) {
+          return;
+        }
 
-      if (_repeatMode == AudioServiceRepeatMode.one) {
-        // Repeat-one: restart the same track.
-        _player.seek(Duration.zero);
-        _player.play();
-      } else {
-        // none / all: advance. `skipToNext` handles wrap-around for `all`.
-        skipToNext();
-      }
-    }));
+        if (_repeatMode == AudioServiceRepeatMode.one) {
+          // Repeat-one: restart the same track.
+          _player.seek(Duration.zero);
+          _player.play();
+        } else {
+          // none / all: advance. `skipToNext` handles wrap-around for `all`.
+          skipToNext();
+        }
+      }),
+    );
   }
 
   // ── Play order (shuffle support) ──────────────────────────────────────────
@@ -386,7 +406,10 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         _trackCacheCompletion(item, source, cachePath);
         return source;
       } catch (e) {
-        printERROR('LockCachingAudioSource failed, falling back to direct stream', e);
+        printERROR(
+          'LockCachingAudioSource failed, falling back to direct stream',
+          e,
+        );
       }
     }
 
@@ -404,26 +427,29 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     String cachePath,
   ) {
     late final StreamSubscription<double> sub;
-    sub = source.downloadProgressStream.listen((progress) async {
-      if (progress < 1.0) return;
-      await sub.cancel();
-      try {
-        final file = File(cachePath);
-        if (!file.existsSync() || file.lengthSync() <= 0) return;
-        await boxPut('SongsCache', item.id, {
-          ...MediaItemBuilder.toJson(item),
-          'cachePath': cachePath,
-          'cachedAt': DateTime.now().toIso8601String(),
-          'size': file.lengthSync(),
-        });
-        printINFO('Cached ${item.id} (${file.lengthSync()} bytes)');
-      } catch (e) {
-        printERROR('Failed to register cache entry for ${item.id}', e);
-      }
-    }, onError: (Object e) {
-      printERROR('Cache download failed for ${item.id}', e);
-      sub.cancel();
-    });
+    sub = source.downloadProgressStream.listen(
+      (progress) async {
+        if (progress < 1.0) return;
+        await sub.cancel();
+        try {
+          final file = File(cachePath);
+          if (!file.existsSync() || file.lengthSync() <= 0) return;
+          await boxPut('SongsCache', item.id, {
+            ...MediaItemBuilder.toJson(item),
+            'cachePath': cachePath,
+            'cachedAt': DateTime.now().toIso8601String(),
+            'size': file.lengthSync(),
+          });
+          printINFO('Cached ${item.id} (${file.lengthSync()} bytes)');
+        } catch (e) {
+          printERROR('Failed to register cache entry for ${item.id}', e);
+        }
+      },
+      onError: (Object e) {
+        printERROR('Cache download failed for ${item.id}', e);
+        sub.cancel();
+      },
+    );
     _subscriptions.add(sub);
   }
 
@@ -440,7 +466,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (cacheFile != null) return cacheFile.uri.toString();
 
     // User download.
-    final downloadEntry = asStringMap(boxGet<dynamic>('SongDownloads', songId, null));
+    final downloadEntry = asStringMap(
+      boxGet<dynamic>('SongDownloads', songId, null),
+    );
     if (downloadEntry.isEmpty) return null;
 
     final path = asText(downloadEntry['url']).isNotEmpty
@@ -448,7 +476,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         : asText(asStringMap(downloadEntry['extras'])['url']);
     if (path.isEmpty) return null;
 
-    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    final file = File(
+      path.startsWith('file://') ? Uri.parse(path).toFilePath() : path,
+    );
     if (file.existsSync() && file.lengthSync() > 0) return file.uri.toString();
     return null;
   }
@@ -460,7 +490,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     String? title,
     String? artist,
   }) async {
-    printINFO('checkNGetUrl: $songId (fresh=$generateNewUrl, title=$title, artist=$artist)');
+    printINFO(
+      'checkNGetUrl: $songId (fresh=$generateNewUrl, title=$title, artist=$artist)',
+    );
 
     if (!offlineReplacementUrl) {
       // 1. Fully cached stream on disk. Verified to exist and be non-empty —
@@ -469,7 +501,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       final cacheFile = await StoragePaths.existingCacheFile(songId);
       if (cacheFile != null) {
         printINFO('Got song from stream cache: ${cacheFile.path}');
-        final cacheEntry = asStringMap(boxGet<dynamic>('SongsCache', songId, null));
+        final cacheEntry = asStringMap(
+          boxGet<dynamic>('SongsCache', songId, null),
+        );
         final rawStreamInfo = cacheEntry['streamInfo'];
         Audio cacheAudio;
         if (rawStreamInfo is List && rawStreamInfo.length > 1) {
@@ -496,13 +530,17 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       }
 
       // 2. Downloaded song
-      final downloadEntry = asStringMap(boxGet<dynamic>('SongDownloads', songId, null));
+      final downloadEntry = asStringMap(
+        boxGet<dynamic>('SongDownloads', songId, null),
+      );
       if (downloadEntry.isNotEmpty) {
         final path = asText(downloadEntry['url']).isNotEmpty
             ? asText(downloadEntry['url'])
             : asText(asStringMap(downloadEntry['extras'])['url']);
         if (path.isNotEmpty) {
-          final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+          final file = File(
+            path.startsWith('file://') ? Uri.parse(path).toFilePath() : path,
+          );
           if (file.existsSync() && file.lengthSync() > 0) {
             final Audio audio = Audio(
               itag: 140,
@@ -536,9 +574,12 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     HMStreamingData? streamInfo;
 
     if (!generateNewUrl) {
-      final cachedJson = asStringMap(boxGet<dynamic>('SongsUrlCache', songId, null));
+      final cachedJson = asStringMap(
+        boxGet<dynamic>('SongsUrlCache', songId, null),
+      );
       if (cachedJson.isNotEmpty) {
-        final rawUrl = asText(asStringMap(cachedJson['lowQualityAudio'])['url']).isNotEmpty
+        final rawUrl =
+            asText(asStringMap(cachedJson['lowQualityAudio'])['url']).isNotEmpty
             ? asText(asStringMap(cachedJson['lowQualityAudio'])['url'])
             : asText(asStringMap(cachedJson['highQualityAudio'])['url']);
         if (rawUrl.isNotEmpty && !isExpired(url: rawUrl)) {
@@ -551,7 +592,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     // 4. Resolve direct 320kbps stream via SaavnService (fastest) or StreamProvider
     if (streamInfo == null || !streamInfo.playable) {
       if (title != null && title.isNotEmpty) {
-        printINFO('Resolving direct 320kbps stream for $title via SaavnService');
+        printINFO(
+          'Resolving direct 320kbps stream for $title via SaavnService',
+        );
         try {
           final saavnUrl = await SaavnService.resolveAudioUrl(title, artist);
           if (saavnUrl != null && saavnUrl.isNotEmpty) {
@@ -579,7 +622,11 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       if (streamInfo == null || !streamInfo.playable) {
         printINFO('Fetching stream for $songId via StreamProvider');
         try {
-          final res = await StreamProvider.fetch(songId, songTitle: title, artistName: artist);
+          final res = await StreamProvider.fetch(
+            songId,
+            songTitle: title,
+            artistName: artist,
+          );
           if (res.playable) {
             streamInfo = HMStreamingData.fromJson(res.hmStreamingData);
           }
@@ -605,7 +652,10 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   // ── Core: Play song at index ─────────────────────────────────────────────
-  Future<void> _playSongAtIndex(int index, {bool generateNewUrl = false}) async {
+  Future<void> _playSongAtIndex(
+    int index, {
+    bool generateNewUrl = false,
+  }) async {
     if (index < 0 || index >= queue.value.length) return;
 
     _currentIndex = index;
@@ -625,7 +675,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     isSongLoading = true;
     playbackState.add(
-      playbackState.value.copyWith(processingState: AudioProcessingState.loading),
+      playbackState.value.copyWith(
+        processingState: AudioProcessingState.loading,
+      ),
     );
 
     // Stop the player first to prevent completion events during transition
@@ -680,15 +732,12 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       currentSongUrl = null;
       isSongLoading = false;
       _isTransitioning = false;
-      printERROR('Cannot play: Unable to resolve audio stream for "${currentSong.title}"');
-      if (queue.value.length > 1 && index < queue.value.length - 1) {
-        skipToNext();
-      } else {
-        playbackState.add(playbackState.value.copyWith(
-          processingState: AudioProcessingState.error,
-          errorMessage: 'Unable to resolve audio stream for "${currentSong.title}"',
-        ));
-      }
+      printERROR(
+        'Cannot play: Unable to resolve audio stream for "${currentSong.title}"',
+      );
+      // Resolution failures are transient catalogue issues. Never surface a
+      // blocking error; advance quietly so radio remains continuous.
+      unawaited(skipToNext());
       return;
     }
 
@@ -733,14 +782,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       printERROR('Failed to start player for ${currentSong.id}', e);
       isSongLoading = false;
       _isTransitioning = false;
-      if (queue.value.length > 1 && index < queue.value.length - 1) {
-        skipToNext();
-      } else {
-        playbackState.add(playbackState.value.copyWith(
-          processingState: AudioProcessingState.error,
-          errorMessage: 'Could not play "${currentSong.title}"',
-        ));
-      }
+      // The stream may have expired or been removed. Keep this recovery in
+      // the background rather than showing a "Could not play" popup.
+      unawaited(skipToNext());
     }
   }
 
@@ -756,9 +800,14 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       final seedTitle = currentItem?.title ?? '';
       final seedArtist = currentItem?.artist ?? '';
       final seedAlbum = currentItem?.album ?? '';
+      final seedLanguage = asText(currentItem?.extras?['language']);
 
       final currentQueue = List<MediaItem>.from(queue.value);
-      final excludeTitles = currentQueue.map((e) => e.title).toList();
+      final recent = boxGet<List<dynamic>>('AppPrefs', 'recentSongs', const []);
+      final excludeTitles = <String>{
+        ...currentQueue.map((e) => e.title),
+        ...recent.map((e) => asText(asStringMap(e)['title'])),
+      }.where((title) => title.trim().isNotEmpty).toList();
       List<SongModel> recommendedSongs = [];
 
       // 1. Groq AI context-aware radio recommendations (fresh trending priority)
@@ -769,6 +818,7 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
             currentTitle: seedTitle,
             currentArtist: seedArtist,
             currentAlbum: seedAlbum,
+            currentLanguage: seedLanguage,
             excludeTitles: excludeTitles,
           );
         } catch (e) {
@@ -777,16 +827,25 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       }
 
       // 2. Saavn related tracks fallback
-      if (recommendedSongs.isEmpty && seedTitle.isNotEmpty) {
-        recommendedSongs = await SaavnService.getRelatedSongs(seedTitle, seedArtist, seedAlbum);
-      }
-
-      // 3. MusicServices radio fallback
-      if (recommendedSongs.isEmpty && seedSongId.isNotEmpty) {
-        final MusicServices musicService = getx.Get.isRegistered<MusicServices>()
-            ? getx.Get.find<MusicServices>()
-            : MusicServices();
-        recommendedSongs = await musicService.getRadioTracks(seedSongId);
+      if (recommendedSongs.isEmpty &&
+          seedTitle.isNotEmpty &&
+          seedLanguage.isNotEmpty) {
+        final related = await SaavnService.getRelatedSongs(
+          seedTitle,
+          seedArtist,
+          seedAlbum,
+        );
+        // Related/radio endpoints can cross regional catalogues, so use them
+        // only as a language-verified fallback. Mood continuity is otherwise
+        // owned by the Groq recommendation profile above.
+        recommendedSongs = related
+            .where(
+              (song) => SaavnService.isExactLanguageMatch(
+                asText(song.extras['language']),
+                seedLanguage,
+              ),
+            )
+            .toList();
       }
 
       if (recommendedSongs.isNotEmpty) {
@@ -805,7 +864,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
           currentQueue.addAll(newItems);
           queue.add(currentQueue);
           _rebuildPlayOrder();
-          printINFO('Appended ${newItems.length} radio tracks. Total: ${currentQueue.length}');
+          printINFO(
+            'Appended ${newItems.length} radio tracks. Total: ${currentQueue.length}',
+          );
         }
       }
     } catch (e) {
@@ -818,8 +879,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   void _addToRecentHistory(MediaItem item) {
     try {
       if (item.id.isEmpty) return;
-      final List<dynamic> recent =
-          List<dynamic>.from(boxGet<List<dynamic>>('AppPrefs', 'recentSongs', const []));
+      final List<dynamic> recent = List<dynamic>.from(
+        boxGet<List<dynamic>>('AppPrefs', 'recentSongs', const []),
+      );
       recent.removeWhere((e) => asText(asStringMap(e)['id']) == item.id);
       recent.insert(0, MediaItemBuilder.toJson(item));
       while (recent.length > 50) {
@@ -917,7 +979,9 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (previous != null) {
       await _playSongAtIndex(previous);
     } else if (_repeatMode == AudioServiceRepeatMode.all) {
-      await _playSongAtIndex(_playOrder.isNotEmpty ? _playOrder.last : q.length - 1);
+      await _playSongAtIndex(
+        _playOrder.isNotEmpty ? _playOrder.last : q.length - 1,
+      );
     } else {
       await _player.seek(Duration.zero);
     }
@@ -935,8 +999,16 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     // The old implementation collapsed `all` and `one` into a single boolean,
     // so repeat-all looped a single track instead of the queue.
     _repeatMode = repeatMode;
-    await boxPut('AppPrefs', 'isLoopModeEnabled', repeatMode == AudioServiceRepeatMode.all);
-    await boxPut('AppPrefs', 'isRepeatOneEnabled', repeatMode == AudioServiceRepeatMode.one);
+    await boxPut(
+      'AppPrefs',
+      'isLoopModeEnabled',
+      repeatMode == AudioServiceRepeatMode.all,
+    );
+    await boxPut(
+      'AppPrefs',
+      'isRepeatOneEnabled',
+      repeatMode == AudioServiceRepeatMode.one,
+    );
     _publishState();
   }
 
@@ -964,27 +1036,29 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     updated.removeAt(index);
     queue.add(updated);
     if (index < _currentIndex) _currentIndex--;
-    _currentIndex = updated.isEmpty ? 0 : _currentIndex.clamp(0, updated.length - 1);
+    _currentIndex = updated.isEmpty
+        ? 0
+        : _currentIndex.clamp(0, updated.length - 1);
     _rebuildPlayOrder();
     _publishState();
   }
 
   @override
-  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
     switch (name) {
       case 'playSong':
         if (extras == null) return false;
         final item = MediaItemBuilder.fromJson(extras['song']);
         if (item.id.isEmpty) return false;
-        final currentQueue = List<MediaItem>.from(queue.value);
-        var idx = currentQueue.indexWhere((q) => q.id == item.id);
-        if (idx < 0) {
-          currentQueue.add(item);
-          idx = currentQueue.length - 1;
-          queue.add(currentQueue);
-          _rebuildPlayOrder(keepCurrent: idx);
-        }
-        await _playSongAtIndex(idx);
+        // A direct song selection starts a fresh radio session. Retaining
+        // prior search results here made unrelated songs leak into auto-next.
+        _currentIndex = 0;
+        queue.add(<MediaItem>[item]);
+        _rebuildPlayOrder(keepCurrent: 0);
+        await _playSongAtIndex(0);
         _autoReplenishRadioQueue(item.id);
         return true;
 

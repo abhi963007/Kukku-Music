@@ -78,6 +78,25 @@ class SaavnService {
     return url.replaceAll('150x150', '500x500').replaceAll('50x50', '500x500');
   }
 
+  /// Normalise the language labels returned by different JioSaavn endpoints.
+  /// Keeping this on the resolved song lets radio reject a same-title result
+  /// from another regional catalogue.
+  static String normalizeLanguage(String language) {
+    return language
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z]'), '')
+        .replaceAll('malayali', 'malayalam')
+        .trim();
+  }
+
+  static bool isExactLanguageMatch(String candidate, String expected) {
+    final normalizedCandidate = normalizeLanguage(candidate);
+    final normalizedExpected = normalizeLanguage(expected);
+    return normalizedCandidate.isNotEmpty &&
+        normalizedExpected.isNotEmpty &&
+        normalizedCandidate == normalizedExpected;
+  }
+
   /// Search songs with direct 320kbps streams (supports high limits and pagination)
   static Future<List<SongModel>> searchSongs(
     String query, {
@@ -126,6 +145,9 @@ class SaavnService {
         );
         final artUri = _cleanImage(asText(map['image']));
         final durationSec = _durationSeconds(moreInfo['duration']);
+        final language = _cleanString(
+          _firstNonEmpty([moreInfo['language'], map['language']], ''),
+        );
 
         if (title.isNotEmpty) {
           songs.add(
@@ -140,6 +162,7 @@ class SaavnService {
                 'url': directAudioUrl ?? '',
                 'bitrate': 320000,
                 'codec': 'MP4A',
+                'language': language,
               },
             ),
           );
