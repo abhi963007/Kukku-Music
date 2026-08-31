@@ -191,7 +191,6 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
           MediaControl.skipToPrevious,
           if (playing) MediaControl.pause else MediaControl.play,
           MediaControl.skipToNext,
-          MediaControl.stop,
         ],
         // Exposing these lets the system UI, Android Auto and wearables drive
         // seeking and shuffle/repeat, which previously did nothing.
