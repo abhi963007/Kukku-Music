@@ -283,6 +283,22 @@ class SupabaseSyncService {
     }
   }
 
+  /// Clear all listening history from Supabase Cloud
+  static Future<bool> clearListeningHistory() async {
+    if (!isReady) return false;
+
+    try {
+      await _client
+          .from('user_history')
+          .delete()
+          .eq('user_id', _userId!);
+      return true;
+    } catch (e) {
+      printERROR('Failed to clear listening history from Supabase', e);
+      return false;
+    }
+  }
+
   /// Fetch recently played songs
   static Future<List<SongModel>> fetchListeningHistory({int limit = 30}) async {
     if (!isReady) return [];

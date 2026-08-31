@@ -156,14 +156,11 @@ class UserDataController extends GetxController {
 
       // 3. Sync History & On-Repeat
       final cloudHistory = await SupabaseSyncService.fetchListeningHistory();
-      if (cloudHistory.isNotEmpty) {
-        history.assignAll(cloudHistory);
-      }
+      history.assignAll(cloudHistory);
+      await boxPut('AppPrefs', 'recentSongs', cloudHistory.map((s) => s.toJson()).toList());
 
       final cloudOnRepeat = await SupabaseSyncService.fetchOnRepeat();
-      if (cloudOnRepeat.isNotEmpty) {
-        onRepeat.assignAll(cloudOnRepeat);
-      }
+      onRepeat.assignAll(cloudOnRepeat);
 
       // 4. Sync Profile preferences
       final profile = await SupabaseSyncService.fetchUserProfile();
@@ -339,9 +336,13 @@ class UserDataController extends GetxController {
     }
   }
 
-  void clearHistory() {
+  Future<void> clearHistory() async {
     history.clear();
-    boxPut('AppPrefs', 'recentSongs', []);
+    onRepeat.clear();
+    await boxPut('AppPrefs', 'recentSongs', []);
+    if (SupabaseSyncService.isReady) {
+      await SupabaseSyncService.clearListeningHistory();
+    }
     _showToast("Listening history cleared", Icons.clear_all_rounded);
   }
 
