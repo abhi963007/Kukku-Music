@@ -8,11 +8,18 @@
 # explicitly so a future manifest refactor cannot silently strip them.
 -keep class com.ryanheise.audioservice.** { *; }
 
+# audio_session is accessed reflectively by audio_service.
+-keep class com.ryanheise.audio_session.** { *; }
+
 # just_audio's platform channel implementation and Media3 entry points.
 -keep class com.ryanheise.just_audio.** { *; }
 -keep class androidx.media3.exoplayer.** { *; }
 -keep class androidx.media3.common.** { *; }
 -keep class androidx.media3.session.** { *; }
+
+# JNI bridge (dart:ffi / jni package) is accessed reflectively at runtime.
+-keep class com.github.dart_lang.jni.** { *; }
+-keep class com.github.dart_lang.jni_flutter.** { *; }
 
 # Media3 references optional codecs/extensions that are not bundled. Without
 # these, R8 fails the build on unresolved references rather than warning.
