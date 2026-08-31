@@ -221,30 +221,11 @@ class _TopBar extends StatelessWidget {
           ),
         ),
 
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.cast_rounded, size: 22),
-              color: AppTheme.textPrimary,
-              tooltip: 'Cast',
-              onPressed: () {
-                Get.rawSnackbar(
-                  message: "Casting devices will appear when available",
-                  duration: const Duration(seconds: 2),
-                  margin: const EdgeInsets.all(16),
-                  borderRadius: 12,
-                  backgroundColor: AppTheme.surface,
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.more_vert_rounded, size: 24),
-              color: AppTheme.textPrimary,
-              tooltip: 'Track options',
-              onPressed: () => YtTrackOptionsSheet.show(context, song),
-            ),
-          ],
+        IconButton(
+          icon: const Icon(Icons.more_vert_rounded, size: 24),
+          color: AppTheme.textPrimary,
+          tooltip: 'Track options',
+          onPressed: () => YtTrackOptionsSheet.show(context, song),
         ),
       ],
     );
