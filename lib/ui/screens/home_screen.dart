@@ -6,6 +6,8 @@ import '../../controllers/player_controller.dart';
 import '../../controllers/user_data_controller.dart';
 import '../../models/song_model.dart';
 import '../../services/music_service.dart';
+import '../../services/supabase_service.dart';
+import '../../utils/helper.dart';
 import '../data/artist_images.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shimmer.dart';
@@ -13,6 +15,7 @@ import '../widgets/song_tile.dart';
 import '../widgets/state_placeholder.dart';
 import 'album_sheet.dart';
 import 'artist_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onNavigateTab;
@@ -179,33 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _loadLanguageContent(_selectedLanguage, forceRefresh: true),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.refresh_rounded, size: 14, color: AppTheme.primary),
-                        SizedBox(width: 4),
-                        Text(
-                          "Refresh",
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const _UserProfileButton(),
               ],
             ),
             const SizedBox(height: 12),
@@ -1070,4 +1047,89 @@ class _TileSkeleton extends StatelessWidget {
     );
   }
 }
+
+class _UserProfileButton extends StatelessWidget {
+  const _UserProfileButton();
+
+  String _getUserInitial() {
+    final user = SupabaseService.currentUser;
+    if (user != null) {
+      final name = user.userMetadata?['full_name'] ?? user.email ?? 'A';
+      return name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : 'A';
+    }
+    final customName = boxGet<String>('AppPrefs', 'user_custom_name', 'M');
+    return customName.isNotEmpty ? customName[0].toUpperCase() : 'M';
+  }
+
+  String _getAvatarUrl() {
+    final user = SupabaseService.currentUser;
+    if (user != null) {
+      final avatar = user.userMetadata?['avatar_url'] ?? user.userMetadata?['picture'] ?? '';
+      if (avatar.toString().isNotEmpty) return avatar.toString();
+    }
+    return boxGet<String>('AppPrefs', 'user_custom_avatar', '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = _getAvatarUrl();
+    final initial = _getUserInitial();
+
+    return Semantics(
+      button: true,
+      label: "Open Profile and Library",
+      child: GestureDetector(
+        onTap: () => Get.to(() => const ProfileScreen(), transition: Transition.cupertino),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [AppTheme.primary, AppTheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2.0),
+            child: ClipOval(
+              child: Container(
+                color: AppTheme.surface,
+                child: avatar.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: avatar,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => _fallback(initial),
+                      )
+                    : _fallback(initial),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallback(String initial) {
+    return Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: AppTheme.primary,
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+        ),
+      ),
+    );
+  }
+}
+
 

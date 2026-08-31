@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mini_player.dart';
 import 'home_screen.dart';
-import 'library_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 
@@ -20,7 +19,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late final List<Widget> _screens = [
     HomeScreen(onNavigateTab: _onTabTapped),
     const SearchScreen(),
-    const LibraryScreen(),
     const SettingsScreen(),
   ];
 
@@ -92,12 +90,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             activeIcon: Icon(Icons.search_rounded),
                             label: "Search",
                             tooltip: "Search",
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.library_music_outlined),
-                            activeIcon: Icon(Icons.library_music_rounded),
-                            label: "Library",
-                            tooltip: "Library",
                           ),
                           BottomNavigationBarItem(
                             icon: Icon(Icons.settings_outlined),
