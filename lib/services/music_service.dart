@@ -7,6 +7,7 @@ import 'package:get/get.dart' as getx;
 
 import '../models/song_model.dart';
 import '../utils/helper.dart';
+import 'ai_discovery_service.dart';
 import 'piped_stream_service.dart';
 import 'saavn_service.dart';
 
@@ -381,7 +382,7 @@ class MusicServices extends getx.GetxService {
   /// How long a cached language section stays fresh (5 minutes for freshness).
   static const Duration _cacheTtl = Duration(minutes: 5);
 
-  /// Fetch categorized content for a specific language with dynamic seed rotation and personalized mix.
+  /// Fetch categorized content for a specific language with AI-driven latest movie discovery and seed rotation.
   Future<LanguageHomeData> getLanguageHomeSections(
     String language, {
     bool forceRefresh = false,
@@ -397,12 +398,26 @@ class MusicServices extends getx.GetxService {
     try {
       final queries = _getQueriesForLanguage(language);
 
-      // Concurrent fetch for trending, albums, movie hits, and melodies
+      // 1. Fetch real-time AI movie & track recommendations for this language
+      final aiMovieQueries = await AiDiscoveryService.getLatestMovieQueries(language);
+
+      // Concurrent fetch for AI movie songs, trending, albums, movie hits, and melodies
       final futures = <Future<dynamic>>[
-        SaavnService.searchSongs(queries.trendingQuery, limit: 30),
-        SaavnService.searchAlbums("${language == 'Trending' ? 'Latest' : language} Soundtracks", limit: 20),
-        SaavnService.searchSongs(queries.movieHitsQuery, limit: 30),
-        SaavnService.searchSongs(queries.melodiesQuery, limit: 30),
+        // 0. AI latest movie tracks
+        Future.wait(
+          aiMovieQueries.take(4).map((q) => SaavnService.searchSongs(q, limit: 6)),
+        ),
+        // 1. General trending
+        SaavnService.searchSongs(queries.trendingQuery, limit: 25),
+        // 2. Soundtracks & Albums
+        SaavnService.searchAlbums(
+          aiMovieQueries.isNotEmpty ? aiMovieQueries.first.split(' ').first : "${language == 'Trending' ? 'Latest' : language} Soundtracks",
+          limit: 20,
+        ),
+        // 3. Movie hits
+        SaavnService.searchSongs(queries.movieHitsQuery, limit: 25),
+        // 4. Melodies
+        SaavnService.searchSongs(queries.melodiesQuery, limit: 25),
       ];
 
       // Personalized Daily Mix generation based on user seeds
@@ -419,29 +434,48 @@ class MusicServices extends getx.GetxService {
 
       final results = await Future.wait(futures);
 
-      final trending = results[0] as List<SongModel>;
-      final albums = results[1] as List<AlbumModel>;
-      final movieHits = results[2] as List<SongModel>;
-      final melodies = results[3] as List<SongModel>;
-      final dailyMix = results.length > 4 ? results[4] as List<SongModel> : <SongModel>[];
+      final rawAiSongsLists = results[0] as List<List<SongModel>>;
+      final List<SongModel> aiMovieSongs = [];
+      for (final list in rawAiSongsLists) {
+        aiMovieSongs.addAll(list);
+      }
 
-      // Shuffle slightly for vibrant organic freshness
-      final organicTrending = List<SongModel>.from(trending);
-      if (organicTrending.length > 6) {
-        organicTrending.shuffle(Random());
+      final generalTrending = results[1] as List<SongModel>;
+      final albums = results[2] as List<AlbumModel>;
+      final movieHits = results[3] as List<SongModel>;
+      final melodies = results[4] as List<SongModel>;
+      final dailyMix = results.length > 5 ? results[5] as List<SongModel> : <SongModel>[];
+
+      // Merge AI movie tracks with general trending (deduplicating by ID)
+      final Set<String> seenIds = {};
+      final List<SongModel> mergedTrending = [];
+
+      for (final s in [...aiMovieSongs, ...generalTrending]) {
+        if (s.id.isNotEmpty && !seenIds.contains(s.id)) {
+          seenIds.add(s.id);
+          mergedTrending.add(s);
+        }
+      }
+
+      final List<SongModel> mergedMovieHits = [];
+      for (final s in [...movieHits, ...aiMovieSongs]) {
+        if (s.id.isNotEmpty && !seenIds.contains(s.id)) {
+          seenIds.add(s.id);
+          mergedMovieHits.add(s);
+        }
       }
 
       final data = LanguageHomeData(
         language: language,
-        trending: organicTrending.isNotEmpty ? organicTrending : await searchTracks(queries.trendingQuery),
+        trending: mergedTrending.isNotEmpty ? mergedTrending : await searchTracks(queries.trendingQuery),
         albums: albums,
-        movieHits: movieHits.isNotEmpty ? movieHits : await searchTracks(queries.movieHitsQuery),
-        topPicks: melodies.isNotEmpty ? melodies : (trending.isNotEmpty ? trending : []),
+        movieHits: mergedMovieHits.isNotEmpty ? mergedMovieHits : movieHits,
+        topPicks: melodies.isNotEmpty ? melodies : (mergedTrending.isNotEmpty ? mergedTrending : []),
         dailyMix: dailyMix,
         artists: queries.popularArtists,
       );
 
-      if (trending.isNotEmpty || movieHits.isNotEmpty || albums.isNotEmpty) {
+      if (mergedTrending.isNotEmpty || albums.isNotEmpty) {
         _languageCache[language] = data;
         _languageCacheStamp[language] = DateTime.now();
       }
